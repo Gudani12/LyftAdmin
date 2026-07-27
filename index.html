@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LYftAdmin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              ink: { DEFAULT: '#12141C', 800: '#1B1E29', 700: '#242836', 600: '#343A4D' },
+              paper: '#F5F5F2',
+              accent: { DEFAULT: '#5B5BD6', 50: '#EFEFFB', 100: '#E1E1F7', 600: '#4C4CC0', 700: '#3E3EA0' },
+              amber: { DEFAULT: '#E3A008', bg: '#FDF3DA' },
+              good: { DEFAULT: '#1E9E5A', bg: '#E3F6EC' },
+              bad: { DEFAULT: '#D8353A', bg: '#FBE6E7' },
+              info: { DEFAULT: '#2F6FED', bg: '#E7EFFD' },
+              slate2: { DEFAULT: '#6B7280', bg: '#F0F1F3' }
+            },
+            fontFamily: {
+              display: ['"Space Grotesk"', 'sans-serif'],
+              body: ['Inter', 'sans-serif'],
+              mono: ['"JetBrains Mono"', 'monospace']
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      html { font-family: 'Inter', sans-serif; }
+      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      ::-webkit-scrollbar-thumb { background: #D8D8D2; border-radius: 8px; }
+      @keyframes pulse-ring {
+        0% { box-shadow: 0 0 0 0 rgba(216,53,58,0.45); }
+        70% { box-shadow: 0 0 0 8px rgba(216,53,58,0); }
+        100% { box-shadow: 0 0 0 0 rgba(216,53,58,0); }
+      }
+      .sos-pulse { animation: pulse-ring 1.6s infinite; }
+    </style>
+  </head>
+  <body class="bg-paper text-ink">
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
