@@ -1,5 +1,6 @@
 import React from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
+import { useUser, SignOutButton } from '@clerk/clerk-react'
 import {
   ShieldCheck, Car, Users, MapPin, Siren, Wallet, SlidersHorizontal,
   MessageSquare, KeyRound, BarChart3, FileText, Bell,
@@ -22,7 +23,10 @@ const NAV = [
 
 export default function Layout() {
   const { currentAdmin, safety } = useData()
+  const { user } = useUser()
   const openSOS = safety.sos.filter((s) => s.status === 'open').length
+  const accountName = user?.fullName || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || currentAdmin.name
+  const accountEmail = user?.primaryEmailAddress?.emailAddress || user?.emailAddresses?.[0]?.emailAddress || currentAdmin.email || null
 
   return (
     <div className="flex min-h-screen">
@@ -55,8 +59,15 @@ export default function Layout() {
           ))}
         </nav>
         <div className="px-5 py-4 border-t border-white/10 text-xs text-white/50">
-          Signed in as <span className="text-white/90 font-medium">{currentAdmin.name}</span>
-          <div className="mt-0.5 capitalize">{currentAdmin.role.replace('_', ' ')}</div>
+          Signed in as <span className="text-white/90 font-medium">{accountName}</span>
+          {accountEmail && <div className="mt-0.5 text-white/70 text-[11px]">{accountEmail}</div>}
+          <div className="mt-3">
+            <SignOutButton>
+              <button className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-white/90 transition hover:bg-white/15">
+                Sign out
+              </button>
+            </SignOutButton>
+          </div>
         </div>
       </aside>
 

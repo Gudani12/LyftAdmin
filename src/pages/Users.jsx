@@ -4,7 +4,7 @@ import { useData } from '../context/DataContext.jsx'
 import { Rail, StatusBadge, Button, Modal, SectionHeader, EmptyState, Star, Planned, fmtDate } from '../components/ui.jsx'
 
 export default function UsersPage() {
-  const { users, setUserStatus, addUserNote, handleDeletionRequest } = useData()
+  const { users, setUserStatus, addUserNote, handleDeletionRequest, deleteUser } = useData()
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(null)
 
@@ -70,6 +70,9 @@ export default function UsersPage() {
                   <div className="text-xs text-slate2 hidden sm:block w-16">{u.rating ? `★ ${u.rating}` : '—'}</div>
                   <StatusBadge status={u.status} />
                   <Button variant="ghost" onClick={() => setActive(u)}>Profile</Button>
+                  <Button variant="bad" className="!px-2 !py-1 text-xs" onClick={() => {
+                    if (window.confirm(`Delete user ${u.name}? This cannot be undone.`)) deleteUser(u.id)
+                  }}>Delete</Button>
                 </div>
               </Rail>
             )

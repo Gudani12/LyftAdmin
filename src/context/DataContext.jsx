@@ -1,17 +1,69 @@
-import React, { createContext, useContext, useState, useCallback } from 'react'
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import {
-  initialVerifications, initialDrivers, initialUsers, initialTrips,
+  initialVerifications, initialUsers, initialTrips,
   initialSafety, initialPayouts, initialFailedPayments, initialAdmins,
 } from '../data/mockData.js'
+import { supabase } from '../lib/supabaseClient.js'
 
 const DataContext = createContext(null)
 export const useData = () => useContext(DataContext)
 
 const CURRENT_ADMIN = { id: 'adm_5', name: 'You', role: 'super_admin' }
 
+const normalizeDriver = (driver) => {
+  const vehicles = Array.isArray(driver.vehicles)
+    ? driver.vehicles
+    : driver.vehicle_details && typeof driver.vehicle_details === 'object'
+      ? [{
+          id: `veh_${driver.id}`,
+          make: driver.vehicle_details.make || '',
+          model: driver.vehicle_details.model || '',
+          year: driver.vehicle_details.year || null,
+          colour: driver.vehicle_details.colour || '',
+          plate: driver.vehicle_details.plate || '',
+          seats: driver.vehicle_details.seats || driver.car_seats || 4,
+          primary: true,
+        }]
+      : []
+
+  return {
+    id: driver.id,
+    name: driver.full_name || `${driver.first_name || ''} ${driver.last_name || ''}`.trim() || driver.email || `Driver ${driver.id}`,
+    email: driver.email,
+    phone: driver.phone_number,
+    status: driver.status || 'pending',
+    verified: driver.verified ?? false,
+    profile_image_url: driver.profile_image_url,
+    driver_license_url: driver.driver_license_url,
+    government_id_url: driver.government_id_url,
+    vehicle_details: driver.vehicle_details,
+    bank_details: driver.bank_details,
+    car_image_url: driver.car_image_url,
+    car_seats: driver.car_seats,
+    total_trips: driver.total_trips,
+    verification_percentage: driver.verification_percentage,
+    profile_data: driver.profile_data,
+    latitude: driver.latitude,
+    longitude: driver.longitude,
+    is_online: driver.is_online,
+    last_location_update: driver.last_location_update,
+    clerk_id: driver.clerk_id,
+    liveApproved: driver.status === 'live' || driver.status === 'approved',
+    backgroundCheck: driver.verified ? 'clear' : 'pending',
+    vehicles,
+    documents: {
+      drivers_licence: driver.driver_license_url ? 'approved' : 'pending',
+      pdp: driver.government_id_url ? 'approved' : 'pending',
+      vehicle_registration: driver.vehicle_details?.registration_url ? 'approved' : 'pending',
+      roadworthy: driver.vehicle_details?.roadworthy_url ? 'approved' : 'pending',
+      insurance: driver.vehicle_details?.insurance_url ? 'approved' : 'pending',
+    },
+  }
+}
+
 export function DataProvider({ children }) {
   const [verifications, setVerifications] = useState(initialVerifications)
-  const [drivers, setDrivers] = useState(initialDrivers)
+  const [drivers, setDrivers] = useState([])
   const [users, setUsers] = useState(initialUsers)
   const [trips, setTrips] = useState(initialTrips)
   const [safety, setSafety] = useState(initialSafety)
@@ -20,6 +72,26 @@ export function DataProvider({ children }) {
   const [admins, setAdmins] = useState(initialAdmins)
   const [auditLog, setAuditLog] = useState([])
   const [notifications, setNotifications] = useState([]) // simulated outbound notifications
+  const [driversLoading, setDriversLoading] = useState(false)
+  const [driversError, setDriversError] = useState(null)
+
+  const loadDrivers = useCallback(async () => {
+    setDriversLoading(true)
+    setDriversError(null)
+    const { data, error } = await supabase.from('drivers').select('*')
+    if (error) {
+      console.error('Failed to load drivers from Supabase', error)
+      setDrivers([])
+      setDriversError(error)
+    } else if (Array.isArray(data)) {
+      setDrivers(data.map(normalizeDriver))
+    }
+    setDriversLoading(false)
+  }, [])
+
+  useEffect(() => {
+    loadDrivers()
+  }, [loadDrivers])
 
   const logAudit = useCallback((action, target) => {
     setAuditLog((log) => [
@@ -63,8 +135,29 @@ export function DataProvider({ children }) {
     })
   }, [verifications, logAudit, notify])
 
-  const setDriverLive = useCallback((driverId, live) => {
-    setDrivers((list) => list.map((d) => d.id === driverId ? { ...d, liveApproved: live, status: live ? 'live' : 'revoked' } : d))
+  const setDriverLive = useCallback(async (driverId, live) => {
+    const status = live ? 'live' : 'revoked'
+    const updatePayload = {
+      status,
+      verified: live,
+      is_online: live,
+      last_location_update: new Date().toISOString(),
+    }
+
+    const { error } = await supabase.from('drivers').update(updatePayload).eq('id', driverId)
+    if (error) {
+      console.error('Failed to update driver live status in Supabase', error)
+    }
+
+    setDrivers((list) => list.map((d) => d.id === driverId ? {
+      ...d,
+      liveApproved: live,
+      status,
+      verified: live,
+      is_online: live,
+      last_location_update: updatePayload.last_location_update,
+    } : d))
+
     const d = drivers.find((x) => x.id === driverId)
     logAudit(live ? 'Approved driver to go live' : 'Revoked driver', d?.name || driverId)
     if (d) notify(d.name, live ? 'You are approved to drive' : 'Driving access revoked', live ? 'You can now go online and accept trips.' : 'Your ability to accept trips has been revoked. Contact support for details.')
@@ -85,6 +178,27 @@ export function DataProvider({ children }) {
   const handleDeletionRequest = useCallback((userId, approve) => {
     setUsers((list) => list.map((u) => u.id === userId ? { ...u, deletionRequested: false, status: approve ? 'deleted' : u.status } : u))
     logAudit(approve ? 'Approved account deletion' : 'Declined deletion request', userId)
+  }, [logAudit])
+
+  const deleteUser = useCallback((userId) => {
+    setUsers((list) => {
+      const removed = list.find((u) => u.id === userId)
+      if (removed) logAudit('Deleted user account', removed.name)
+      return list.filter((u) => u.id !== userId)
+    })
+  }, [logAudit])
+
+  const deleteDriver = useCallback(async (driverId) => {
+    const { error } = await supabase.from('drivers').delete().eq('id', driverId)
+    if (error) {
+      console.error('Failed to delete driver from Supabase', error)
+      return
+    }
+    setDrivers((list) => {
+      const removed = list.find((d) => d.id === driverId)
+      if (removed) logAudit('Deleted driver', removed.name)
+      return list.filter((d) => d.id !== driverId)
+    })
   }, [logAudit])
 
   const acknowledgeSOS = useCallback((id) => {
@@ -120,7 +234,9 @@ export function DataProvider({ children }) {
     currentAdmin: CURRENT_ADMIN,
     verifications, drivers, users, trips, safety, payouts, failedPayments, admins, auditLog, notifications,
     decideVerification, bulkApprove, setDriverLive, setUserStatus, addUserNote, handleDeletionRequest,
+    deleteUser, deleteDriver,
     acknowledgeSOS, resolveSOS, forceEndTrip, refundTrip, retryFailedPayment, sendPushToUser, logAudit,
+    driversLoading, driversError,
   }
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>

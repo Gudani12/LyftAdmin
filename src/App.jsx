@@ -1,5 +1,6 @@
 import React from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
+import { useAuth } from '@clerk/clerk-react'
 import Layout from './components/Layout.jsx'
 import Verification from './pages/Verification.jsx'
 import Drivers from './pages/Drivers.jsx'
@@ -12,11 +13,26 @@ import Comments from './pages/Comments.jsx'
 import AdminAccounts from './pages/AdminAccounts.jsx'
 import Reporting from './pages/Reporting.jsx'
 import Content from './pages/Content.jsx'
+import Auth from './pages/Auth.jsx'
+
+function RequireAuth({ children }) {
+  const { isSignedIn } = useAuth()
+  if (isSignedIn === undefined) return null
+  return isSignedIn ? children : <Navigate to="/login" replace />
+}
 
 export default function App() {
   return (
     <Routes>
-      <Route element={<Layout />}>
+      <Route path="/login/*" element={<Auth />} />
+      <Route path="/register/*" element={<Auth />} />
+      <Route
+        element={
+          <RequireAuth>
+            <Layout />
+          </RequireAuth>
+        }
+      >
         <Route index element={<Navigate to="/verification" replace />} />
         <Route path="/verification" element={<Verification />} />
         <Route path="/drivers" element={<Drivers />} />
@@ -31,6 +47,7 @@ export default function App() {
         <Route path="/content" element={<Content />} />
         <Route path="*" element={<Navigate to="/verification" replace />} />
       </Route>
+      <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   )
 }

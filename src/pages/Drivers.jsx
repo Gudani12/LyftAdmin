@@ -7,47 +7,64 @@ import { Rail, StatusBadge, Button, Modal, SectionHeader, Planned } from '../com
 const DRIVER_DOC_KEYS = ['drivers_licence', 'pdp', 'vehicle_registration', 'roadworthy', 'insurance']
 
 export default function Drivers() {
-  const { drivers, setDriverLive } = useData()
+  const { drivers, driversLoading, driversError, setDriverLive, deleteDriver } = useData()
   const [active, setActive] = useState(null)
 
   return (
     <div>
       <SectionHeader title="Drivers" subtitle="Document status, vehicles, and go-live approval." />
 
-      <div className="space-y-2">
-        {drivers.map((d) => {
-          const allApproved = DRIVER_DOC_KEYS.every((k) => d.documents[k] === 'approved')
-          const hasExpired = DRIVER_DOC_KEYS.some((k) => d.documents[k] === 'expired')
-          const tone = hasExpired ? 'urgent' : d.liveApproved ? 'ok' : allApproved ? 'info' : 'warn'
-          return (
-            <Rail key={d.id} tone={tone}>
-              <div className="flex items-center gap-4 px-4 py-3">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm">{d.name}</span>
-                    {d.backgroundCheck !== 'clear' && (
-                      <span title="Background check pending"><ShieldAlert size={13} className="text-amber" /></span>
-                    )}
+      {driversLoading ? (
+        <div className="rounded-xl border border-black/5 bg-white px-6 py-8 text-center text-sm text-slate2">
+          Loading drivers from the database...
+        </div>
+      ) : driversError ? (
+        <div className="rounded-xl border border-bad/20 bg-bad-bg px-6 py-8 text-center text-sm text-bad">
+          Error loading drivers: {driversError.message || JSON.stringify(driversError)}
+        </div>
+      ) : drivers.length === 0 ? (
+        <div className="rounded-xl border border-black/5 bg-white px-6 py-8 text-center text-sm text-slate2">
+          No drivers found in the database. Confirm the Supabase `drivers` table exists and you have active rows.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {drivers.map((d) => {
+            const allApproved = DRIVER_DOC_KEYS.every((k) => d.documents[k] === 'approved')
+            const hasExpired = DRIVER_DOC_KEYS.some((k) => d.documents[k] === 'expired')
+            const tone = hasExpired ? 'urgent' : d.liveApproved ? 'ok' : allApproved ? 'info' : 'warn'
+            return (
+              <Rail key={d.id} tone={tone}>
+                <div className="flex items-center gap-4 px-4 py-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm">{d.name}</span>
+                      {d.backgroundCheck !== 'clear' && (
+                        <span title="Background check pending"><ShieldAlert size={13} className="text-amber" /></span>
+                      )}
+                    </div>
+                    <div className="text-xs text-slate2 mt-0.5 flex items-center gap-1.5">
+                      <Car size={12} />
+                      {d.vehicles.map((v) => `${v.make} ${v.model} (${v.plate})`).join(' + ')}
+                    </div>
                   </div>
-                  <div className="text-xs text-slate2 mt-0.5 flex items-center gap-1.5">
-                    <Car size={12} />
-                    {d.vehicles.map((v) => `${v.make} ${v.model} (${v.plate})`).join(' + ')}
+                  <div className="hidden md:flex items-center gap-1">
+                    {DRIVER_DOC_KEYS.map((k) => (
+                      <span key={k} title={DOC_TYPES.find((t) => t.key === k)?.label} className={`h-2 w-2 rounded-full ${
+                        d.documents[k] === 'approved' ? 'bg-good' : d.documents[k] === 'pending' ? 'bg-amber' : d.documents[k] === 'expired' ? 'bg-bad' : 'bg-slate2/40'
+                      }`} />
+                    ))}
                   </div>
+                  <StatusBadge status={d.status} />
+                  <Button variant="ghost" onClick={() => setActive(d)}>Details</Button>
+                  <Button variant="bad" className="!px-2 !py-1 text-xs" onClick={() => {
+                    if (window.confirm(`Delete driver ${d.name}? This cannot be undone.`)) deleteDriver(d.id)
+                  }}>Delete</Button>
                 </div>
-                <div className="hidden md:flex items-center gap-1">
-                  {DRIVER_DOC_KEYS.map((k) => (
-                    <span key={k} title={DOC_TYPES.find((t) => t.key === k)?.label} className={`h-2 w-2 rounded-full ${
-                      d.documents[k] === 'approved' ? 'bg-good' : d.documents[k] === 'pending' ? 'bg-amber' : d.documents[k] === 'expired' ? 'bg-bad' : 'bg-slate2/40'
-                    }`} />
-                  ))}
-                </div>
-                <StatusBadge status={d.status} />
-                <Button variant="ghost" onClick={() => setActive(d)}>Details</Button>
-              </div>
-            </Rail>
-          )
-        })}
-      </div>
+              </Rail>
+            )
+          })}
+        </div>
+      )}
 
       <div className="mt-6">
         <Planned items={[
