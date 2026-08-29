@@ -31,15 +31,12 @@ export function StatusBadge({ status }) {
   const label = String(status).replace(/_/g, ' ')
   const style = STATUS_STYLES[status] || 'bg-slate2-bg text-slate2 border-slate2/30'
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize ${style}`}>
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold capitalize tracking-wide ${style}`}>
       {label}
     </span>
   )
 }
 
-// The signature element: a colored rail on the left edge of a row/card,
-// giving every module the same at-a-glance urgency language. No border —
-// a soft shadow gives it depth instead, and it lifts slightly on hover.
 const RAIL_COLORS = {
   urgent: 'bg-bad',
   warn: 'bg-amber',
@@ -50,18 +47,16 @@ const RAIL_COLORS = {
 
 export function Rail({ tone = 'neutral', children, className = '' }) {
   return (
-    <div className={`flex rounded-lg bg-white shadow-[0_1px_2px_rgba(6,35,26,0.06)] hover:shadow-[0_4px_12px_rgba(6,35,26,0.08)] transition-shadow overflow-hidden ${className}`}>
+    <div className={`animate-fade-in-up group flex overflow-hidden rounded-2xl border border-black/5 bg-white shadow-[0_10px_24px_rgba(15,23,42,0.04)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_28px_rgba(15,23,42,0.08)] ${className}`}>
       <div className={`w-1.5 shrink-0 ${RAIL_COLORS[tone]}`} />
-      <div className="flex-1 min-w-0">{children}</div>
+      <div className="min-w-0 flex-1">{children}</div>
     </div>
   )
 }
 
-// Generic elevated surface for top-level summary boxes (metrics, form
-// panels, config fields) — same shadow language as Rail, no left stripe.
 export function Card({ children, className = '' }) {
   return (
-    <div className={`rounded-lg bg-white shadow-[0_1px_2px_rgba(6,35,26,0.06)] ${className}`}>
+    <div className={`animate-fade-in-up rounded-2xl border border-black/5 bg-white shadow-[0_10px_24px_rgba(15,23,42,0.04)] transition-transform duration-200 hover:-translate-y-0.5 ${className}`}>
       {children}
     </div>
   )
@@ -69,10 +64,10 @@ export function Card({ children, className = '' }) {
 
 export function SectionHeader({ title, subtitle, action }) {
   return (
-    <div className="flex items-start justify-between mb-5 gap-4">
+    <div className="mb-5 flex items-start justify-between gap-4">
       <div>
-        <h1 className="font-display text-2xl font-semibold text-ink">{title}</h1>
-        {subtitle && <p className="text-sm text-ink-600/70 text-slate2 mt-1">{subtitle}</p>}
+        <h1 className="font-display text-2xl font-semibold tracking-tight text-ink md:text-[2rem]">{title}</h1>
+        {subtitle && <p className="mt-1 text-sm text-slate2">{subtitle}</p>}
       </div>
       {action}
     </div>
@@ -81,15 +76,15 @@ export function SectionHeader({ title, subtitle, action }) {
 
 export function Button({ children, variant = 'primary', className = '', ...props }) {
   const variants = {
-    primary: 'bg-ink text-white hover:bg-ink-700',
-    accent: 'bg-accent text-white hover:bg-accent-600',
-    good: 'bg-good text-white hover:opacity-90',
-    bad: 'bg-bad text-white hover:opacity-90',
+    primary: 'bg-ink text-white shadow-[0_8px_18px_rgba(16,24,20,0.18)] hover:bg-ink/90',
+    accent: 'bg-accent text-white shadow-[0_8px_18px_rgba(14,92,63,0.2)] hover:bg-accent-600',
+    good: 'bg-good text-white shadow-[0_8px_18px_rgba(18,114,79,0.22)] hover:opacity-95',
+    bad: 'bg-bad text-white shadow-[0_8px_18px_rgba(224,69,69,0.22)] hover:opacity-95',
     ghost: 'bg-transparent text-ink border border-black/10 hover:bg-black/5',
   }
   return (
     <button
-      className={`inline-flex items-center justify-center gap-1.5 rounded-md px-3.5 py-2 text-sm font-medium transition disabled:opacity-40 disabled:cursor-not-allowed ${variants[variant]} ${className}`}
+      className={`inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-medium transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-40 ${variants[variant]} ${className}`}
       {...props}
     >
       {children}
@@ -100,14 +95,14 @@ export function Button({ children, variant = 'primary', className = '', ...props
 export function Modal({ open, onClose, title, children, wide }) {
   if (!open) return null
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 backdrop-blur-sm p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4 backdrop-blur-sm" onClick={onClose}>
       <div
-        className={`w-full ${wide ? 'max-w-3xl' : 'max-w-md'} max-h-[90vh] overflow-y-auto rounded-xl bg-white shadow-2xl`}
+        className={`w-full ${wide ? 'max-w-3xl' : 'max-w-md'} max-h-[90vh] overflow-y-auto rounded-2xl border border-black/5 bg-white shadow-[0_25px_80px_rgba(0,0,0,0.18)]`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-black/5 px-5 py-4">
-          <h2 className="font-display text-lg font-semibold">{title}</h2>
-          <button onClick={onClose} className="text-slate2 hover:text-ink text-lg leading-none">✕</button>
+          <h2 className="font-display text-lg font-semibold text-ink">{title}</h2>
+          <button onClick={onClose} className="text-slate2 transition hover:text-ink">✕</button>
         </div>
         <div className="p-5">{children}</div>
       </div>
@@ -117,9 +112,9 @@ export function Modal({ open, onClose, title, children, wide }) {
 
 export function EmptyState({ title, hint }) {
   return (
-    <div className="rounded-lg border border-dashed border-black/10 py-12 text-center">
+    <div className="rounded-2xl border border-dashed border-black/10 bg-white/70 py-12 text-center shadow-[0_10px_24px_rgba(15,23,42,0.02)]">
       <p className="font-medium text-ink">{title}</p>
-      {hint && <p className="text-sm text-slate2 mt-1">{hint}</p>}
+      {hint && <p className="mt-1 text-sm text-slate2">{hint}</p>}
     </div>
   )
 }
@@ -130,12 +125,12 @@ export function Star() {
 
 export function Planned({ items }) {
   return (
-    <div className="rounded-lg border border-black/5 bg-white p-5">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate2 mb-3">Planned — not yet built</p>
+    <div className="rounded-2xl border border-black/5 bg-white p-5 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
+      <p className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate2">Planned — not yet built</p>
       <ul className="space-y-2">
         {items.map((it) => (
           <li key={it} className="flex items-start gap-2 text-sm text-ink-700">
-            <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-slate2/50 shrink-0" />
+            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate2/60" />
             {it}
           </li>
         ))}

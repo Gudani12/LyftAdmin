@@ -3,6 +3,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 import {
   ShieldCheck, Car, Users, MapPin, Siren, Wallet, SlidersHorizontal,
   MessageSquare, KeyRound, BarChart3, FileText, Bell, Search, ChevronDown,
+  Sparkles,
 } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
 
@@ -40,73 +41,112 @@ export default function Layout() {
   const openSOS = safety.sos.filter((s) => s.status === 'open').length
 
   return (
-    <div className="flex min-h-screen">
-      <aside className="w-60 shrink-0 bg-ink text-white flex flex-col">
-        <div className="px-5 py-5 border-b border-white/10">
-          <div className="font-display text-xl font-bold tracking-tight">
-            LYft<span className="text-accent">Admin</span>
-          </div>
-          <div className="text-[11px] text-white/40 mt-0.5">Operations console</div>
-        </div>
-        <nav className="flex-1 overflow-y-auto py-3">
-          {NAV_GROUPS.map((group) => (
-            <div key={group.label} className="mb-4 last:mb-0">
-              <div className="px-5 mb-1 text-[10px] font-semibold uppercase tracking-wider text-white/30">
-                {group.label}
+    <div className="flex min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(14,92,63,0.16),_transparent_25%),linear-gradient(180deg,#eef5f1_0%,#f5f7f6_100%)] text-ink">
+      <aside className="animate-fade-in-up relative w-[260px] shrink-0 border-r border-white/20 bg-[#081c16] text-white shadow-[0_20px_45px_rgba(0,0,0,0.18)]">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(24,126,89,0.28),transparent_40%)]" />
+        <div className="relative flex h-full flex-col">
+          <div className="border-b border-white/10 px-5 py-5">
+            <div className="flex items-center gap-3">
+              <div className="soft-glow flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/15 backdrop-blur-sm">
+                <Sparkles size={18} className="text-mint" />
               </div>
-              {group.items.map(({ to, label, icon: Icon }) => (
-                <NavLink
-                  key={to}
-                  to={to}
-                  className={({ isActive }) =>
-                    `mx-2 mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition relative ${
-                      isActive ? 'bg-white/10 text-white font-medium' : 'text-white/60 hover:bg-white/5 hover:text-white'
-                    }`
-                  }
-                >
-                  <Icon size={16} strokeWidth={2} />
-                  {label}
-                  {label === 'Safety' && openSOS > 0 && (
-                    <span className="ml-auto flex h-4 w-4 items-center justify-center rounded-full bg-bad text-[10px] font-bold sos-pulse">
-                      {openSOS}
-                    </span>
-                  )}
-                </NavLink>
-              ))}
+              <div>
+                <div className="font-display text-xl font-bold tracking-tight">
+                  LYft<span className="text-mint">Admin</span>
+                </div>
+                <div className="text-[11px] text-white/45">Operations console</div>
+              </div>
             </div>
-          ))}
-        </nav>
-        <div className="px-5 py-4 border-t border-white/10 text-xs text-white/50">
-          Signed in as <span className="text-white/90 font-medium">{currentAdmin.name}</span>
-          <div className="mt-0.5 capitalize">{currentAdmin.role.replace('_', ' ')}</div>
+          </div>
+
+          <nav className="flex-1 overflow-y-auto px-3 py-4">
+            {NAV_GROUPS.map((group) => (
+              <div key={group.label} className="mb-5 last:mb-0">
+                <div className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/35">
+                  {group.label}
+                </div>
+                <div className="space-y-1">
+                  {group.items.map(({ to, label, icon: Icon }) => (
+                    <NavLink
+                      key={to}
+                      to={to}
+                      className={({ isActive }) =>
+                        `group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 hover:-translate-x-0.5 ${
+                          isActive
+                            ? 'bg-white/10 text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]'
+                            : 'text-white/65 hover:bg-white/5 hover:text-white'
+                        }`
+                      }
+                    >
+                      {({ isActive }) => (
+                        <>
+                          <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${isActive ? 'bg-accent/30 text-white' : 'bg-white/5 text-white/75 group-hover:bg-white/10'}`}>
+                            <Icon size={16} strokeWidth={2.1} />
+                          </span>
+                          <span>{label}</span>
+                          {label === 'Safety' && openSOS > 0 && (
+                            <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-bad px-1 text-[10px] font-bold sos-pulse">
+                              {openSOS}
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </NavLink>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </nav>
+
+          <div className="border-t border-white/10 px-4 py-4">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-3 backdrop-blur-sm">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-mint to-accent text-xs font-bold text-ink shadow-lg shadow-emerald-500/20">
+                  {currentAdmin.name.split(' ').map((s) => s[0]).join('').slice(0, 2)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-semibold text-white">{currentAdmin.name}</div>
+                  <div className="truncate text-[11px] capitalize text-white/55">{currentAdmin.role.replace('_', ' ')}</div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </aside>
 
-      <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-14 shrink-0 border-b border-black/5 bg-white flex items-center justify-between px-6 gap-6">
-          <div className="relative flex-1 max-w-sm">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate2" />
-            <input
-              placeholder="Search users, drivers, trips..."
-              className="w-full rounded-md border border-black/10 bg-paper pl-8 pr-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
-            />
-          </div>
-          <div className="flex items-center gap-4 shrink-0">
-            <div className="text-sm text-slate2">South Africa &middot; Johannesburg (UTC+2)</div>
-            <div className="relative">
-              <Bell size={18} className="text-slate2" />
-              {openSOS > 0 && <span className="absolute -top-1.5 -right-1.5 h-2.5 w-2.5 rounded-full bg-bad" />}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-20 border-b border-black/5 bg-white/75 backdrop-blur-xl">
+          <div className="flex items-center justify-between gap-6 px-6 py-3.5">
+            <div className="relative flex-1 max-w-xl">
+              <Search size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate2" />
+              <input
+                placeholder="Search users, drivers, trips..."
+                className="w-full rounded-2xl border border-black/5 bg-[#f5f7f6] pl-10 pr-3 py-2.5 text-sm text-ink shadow-[0_1px_0_rgba(15,23,42,0.02)] outline-none transition focus:border-accent/40 focus:bg-white focus:ring-4 focus:ring-accent/10"
+              />
             </div>
-            <button className="flex items-center gap-1.5 hover:bg-black/5 rounded-full pr-1.5 py-0.5 transition">
-              <div className="h-8 w-8 rounded-full bg-accent-100 text-accent-700 flex items-center justify-center text-xs font-semibold">
-                {currentAdmin.name.split(' ').map((s) => s[0]).join('').slice(0, 2)}
+
+            <div className="flex items-center gap-4 shrink-0">
+              <div className="hidden rounded-full border border-black/5 bg-white px-3 py-1.5 text-sm text-slate2 md:block">
+                South Africa &middot; Johannesburg (UTC+2)
               </div>
-              <ChevronDown size={14} className="text-slate2" />
-            </button>
+              <div className="relative flex h-10 w-10 items-center justify-center rounded-full border border-black/5 bg-white text-slate2 shadow-sm transition hover:shadow-md">
+                <Bell size={17} />
+                {openSOS > 0 && <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-bad ring-2 ring-white" />}
+              </div>
+              <button className="flex items-center gap-2 rounded-full border border-black/5 bg-white px-2 py-1.5 shadow-sm transition hover:shadow-md">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-accent-100 via-emerald-100 to-mint text-xs font-bold text-accent-700">
+                  {currentAdmin.name.split(' ').map((s) => s[0]).join('').slice(0, 2)}
+                </div>
+                <ChevronDown size={14} className="text-slate2" />
+              </button>
+            </div>
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto p-6 bg-paper">
-          <Outlet />
+
+        <main className="flex-1 overflow-y-auto p-5 md:p-6">
+          <div className="mx-auto max-w-[1600px]">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

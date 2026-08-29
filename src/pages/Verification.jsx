@@ -82,15 +82,15 @@ export default function Verification() {
       )}
 
       {/* Counts by type <Star/> */}
-      <div className="mb-5 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+      <div className="mb-5 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
         {DOC_TYPES.map((t) => (
           <button
             key={t.key}
             onClick={() => setTypeFilter(typeFilter === t.key ? 'all' : t.key)}
-            className={`rounded-lg border px-3 py-2 text-left transition ${typeFilter === t.key ? 'border-accent bg-accent-50' : 'border-black/5 bg-white hover:border-black/10'}`}
+            className={`rounded-2xl border px-4 py-3 text-left transition shadow-[0_10px_24px_rgba(15,23,42,0.03)] ${typeFilter === t.key ? 'border-accent bg-accent-50 ring-1 ring-accent/30' : 'border-black/5 bg-white hover:border-black/10'}`}
           >
-            <div className="text-xl font-display font-semibold">{countsByType[t.key] || 0}</div>
-            <div className="text-[11px] text-slate2 leading-tight">{t.label}</div>
+            <div className="text-2xl font-display font-semibold">{countsByType[t.key] || 0}</div>
+            <div className="text-[11px] text-slate2 leading-tight mt-1">{t.label}</div>
           </button>
         ))}
       </div>
@@ -120,7 +120,7 @@ export default function Verification() {
       {filtered.length === 0 ? (
         <EmptyState title="Nothing in this queue" hint="Try a different status or document type filter." />
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {filtered.map((v) => {
             const tone = v.status === 'pending' || v.status === 'resubmitted' ? 'warn' : v.status === 'expired' || v.status === 'rejected' ? 'urgent' : v.status === 'approved' ? 'ok' : 'neutral'
             const canBulk = eligibleForBulk.includes(v)
@@ -181,17 +181,17 @@ function ReviewModal({ verification: v, onClose, onDecide }) {
 
   return (
     <Modal open={!!v} onClose={onClose} title={`Review — ${v.userName}`} wide>
-      <div className="grid grid-cols-2 gap-5">
+      <div className="grid gap-5 md:grid-cols-2">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate2 mb-2">Uploaded document</p>
-          <div className="aspect-[4/3] rounded-lg border border-dashed border-black/15 bg-slate2-bg flex flex-col items-center justify-center text-slate2">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate2 mb-2">Uploaded document</p>
+          <div className="aspect-[4/3] rounded-2xl border border-dashed border-black/15 bg-slate-50 flex flex-col items-center justify-center text-slate2 shadow-inner">
             <FileImage size={32} />
             <span className="text-xs mt-2">{v.documentImage ? `${v.documentImage}.jpg` : 'No document on file'}</span>
           </div>
           {v.resubmissionHistory?.length > 0 && (
             <div className="mt-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate2 mb-1">Resubmission history</p>
-              <ul className="text-xs space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate2 mb-2">Resubmission history</p>
+              <ul className="text-xs space-y-1.5">
                 {v.resubmissionHistory.map((r, i) => (
                   <li key={i} className="text-ink-700">Rejected {timeAgo(r.at)} by {r.by} — {r.reason}</li>
                 ))}

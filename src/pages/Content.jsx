@@ -29,32 +29,34 @@ export default function Content() {
   }
 
   return (
-    <div>
+    <div className="space-y-6">
       <SectionHeader
         title="Content"
         subtitle="Edit static in-app content."
         action={<Button variant="accent" onClick={save}>{saved ? <><Check size={15} /> Saved</> : 'Save changes'}</Button>}
       />
 
-      <div className="flex gap-1.5 mb-4 flex-wrap">
+      <div className="flex gap-2 mb-5 flex-wrap">
         {TABS.map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`rounded-full px-3 py-1 text-xs font-medium border transition ${tab === t.key ? 'bg-deep text-white border-deep' : 'border-black/10 text-ink-700 hover:bg-black/5'}`}
+            className={`rounded-xl px-4 py-2 text-xs font-medium border transition ${tab === t.key ? 'bg-deep text-white border-deep shadow-lg' : 'border-black/10 text-ink-700 hover:bg-black/5'}`}
           >
             {t.label}
           </button>
         ))}
       </div>
 
-      <textarea
-        value={content[tab]}
-        onChange={(e) => setContent({ ...content, [tab]: e.target.value })}
-        rows={14}
-        className="w-full rounded-lg border border-black/10 bg-white p-4 text-sm font-mono leading-relaxed focus:outline-none focus:ring-2 focus:ring-accent/40"
-      />
-      <p className="text-xs text-slate2 mt-2">This is a local draft. Publishing to the live app isn't wired up yet — hook this up to your content API when ready.</p>
+      <div className="rounded-2xl border border-black/5 bg-white p-5 shadow-[0_10px_24px_rgba(15,23,42,0.03)]">
+        <textarea
+          value={content[tab]}
+          onChange={(e) => setContent({ ...content, [tab]: e.target.value })}
+          rows={14}
+          className="w-full rounded-xl border border-black/10 bg-slate-50 p-4 text-sm font-mono leading-relaxed focus:outline-none focus:ring-2 focus:ring-accent/40"
+        />
+        <p className="text-xs text-slate2 mt-3">This is a local draft. Publishing to the live app isn't wired up yet — hook this up to your content API when ready.</p>
+      </div>
     </div>
   )
 }

@@ -1,7 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react'
-import { Siren, Volume2, VolumeX, Star as StarIcon, Flag } from 'lucide-react'
+import React, { useEffect, useRef, useState, useMemo } from 'react'
+import { Siren, Volume2, VolumeX, Star as StarIcon, Flag, AlertTriangle } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
-import { Rail, StatusBadge, Button, Modal, SectionHeader, EmptyState, Planned, timeAgo } from '../components/ui.jsx'
+import { Rail, StatusBadge, Button, Modal, SectionHeader, EmptyState, Planned, timeAgo, Card } from '../components/ui.jsx'
 
 function beep() {
   try {
@@ -28,13 +28,20 @@ export default function Safety() {
   const ackSOS = safety.sos.filter((s) => s.status === 'acknowledged')
   const resolvedSOS = safety.sos.filter((s) => s.status === 'resolved')
 
+  const summary = useMemo(() => ({
+    open: openSOS.length,
+    acknowledged: ackSOS.length,
+    lowRatings: safety.lowRatingFlags.length,
+    reports: safety.reportedUsers.length,
+  }), [openSOS.length, ackSOS.length, safety.lowRatingFlags.length, safety.reportedUsers.length])
+
   useEffect(() => {
     if (!muted && openSOS.length > lastOpenCount.current) beep()
     lastOpenCount.current = openSOS.length
   }, [openSOS.length, muted])
 
   return (
-    <div>
+    <div className="space-y-6">
       <SectionHeader
         title="Safety"
         subtitle="SOS alerts, low-rating flags, and reported users."
@@ -45,6 +52,13 @@ export default function Safety() {
         }
       />
 
+      <div className="grid gap-4 md:grid-cols-4">
+        <SummaryKPI label="Open SOS" value={summary.open} tone="urgent" icon={Siren} />
+        <SummaryKPI label="Acknowledged" value={summary.acknowledged} tone="warn" icon={AlertTriangle} />
+        <SummaryKPI label="Low-rating flags" value={summary.lowRatings} tone="amber" icon={StarIcon} />
+        <SummaryKPI label="Reported users" value={summary.reports} tone="bad" icon={Flag} />
+      </div>
+
       <div className="mb-3 flex items-center gap-2">
         <Siren size={16} className="text-bad" />
         <h2 className="font-display font-semibold">SOS inbox</h2>
@@ -54,7 +68,7 @@ export default function Safety() {
       {safety.sos.length === 0 ? (
         <EmptyState title="No SOS alerts" />
       ) : (
-        <div className="space-y-2 mb-6">
+        <div className="space-y-3 mb-6">
           {[...openSOS, ...ackSOS, ...resolvedSOS].map((s) => (
             <Rail key={s.id} tone={s.status === 'open' ? 'urgent' : s.status === 'acknowledged' ? 'warn' : 'ok'}>
               <div className="flex items-center gap-4 px-4 py-3">
@@ -79,7 +93,7 @@ export default function Safety() {
             <h2 className="font-display font-semibold">Low-rating flags</h2>
           </div>
           {safety.lowRatingFlags.length === 0 ? <EmptyState title="No flags" /> : (
-            <div className="space-y-2">
+            <div className="space-y-3">
               {safety.lowRatingFlags.map((f) => (
                 <Rail key={f.id} tone="warn">
                   <div className="px-4 py-3">
@@ -97,7 +111,7 @@ export default function Safety() {
             <h2 className="font-display font-semibold">Reported users</h2>
           </div>
           {safety.reportedUsers.length === 0 ? <EmptyState title="No reports" /> : (
-            <div className="space-y-2">
+            <div className="space-y-3">
               {safety.reportedUsers.map((r) => (
                 <Rail key={r.id} tone={r.status === 'open' ? 'urgent' : 'warn'}>
                   <div className="flex items-center justify-between px-4 py-3">
@@ -122,12 +136,34 @@ export default function Safety() {
 
       <Modal open={!!resolving} onClose={() => setResolving(null)} title="Resolve SOS alert">
         <label className="text-xs text-slate2">Resolution note</label>
-        <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} className="mt-1 w-full rounded-md border border-black/10 px-2.5 py-1.5 text-sm" placeholder="What happened, and how it was resolved..." />
-        <div className="mt-3 flex justify-end gap-2">
+        <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} className="mt-1 w-full rounded-2xl border border-black/10 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/40" placeholder="What happened, and how it was resolved..." />
+        <div className="mt-4 flex justify-end gap-2 border-t border-black/5 pt-4">
           <Button variant="ghost" onClick={() => setResolving(null)}>Cancel</Button>
           <Button variant="good" onClick={() => { resolveSOS(resolving.id, note || 'Resolved by admin.'); setNote(''); setResolving(null) }}>Mark resolved</Button>
         </div>
       </Modal>
     </div>
+  )
+}
+
+function SummaryKPI({ label, value, tone, icon: Icon }) {
+  const tones = {
+    urgent: 'border-bad/15 bg-bad-bg text-bad',
+    warn: 'border-amber/20 bg-amber-bg text-amber-700',
+    amber: 'border-amber/20 bg-amber-bg text-amber-700',
+    bad: 'border-bad/15 bg-bad-bg text-bad',
+  }
+  return (
+    <Card className={`p-4 ${tones[tone]}`}>
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em]">{label}</div>
+          <div className="mt-2 font-display text-3xl font-semibold tracking-tight">{value}</div>
+        </div>
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/70 ring-1 ring-black/5">
+          <Icon size={18} />
+        </div>
+      </div>
+    </Card>
   )
 }
