@@ -1,0 +1,7 @@
+node_modules/
+.expo/
+.vite/
+dist/
+.env
+*.log
+.DS_Store

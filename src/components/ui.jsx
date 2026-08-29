@@ -38,7 +38,8 @@ export function StatusBadge({ status }) {
 }
 
 // The signature element: a colored rail on the left edge of a row/card,
-// giving every module the same at-a-glance urgency language.
+// giving every module the same at-a-glance urgency language. No border —
+// a soft shadow gives it depth instead, and it lifts slightly on hover.
 const RAIL_COLORS = {
   urgent: 'bg-bad',
   warn: 'bg-amber',
@@ -49,9 +50,19 @@ const RAIL_COLORS = {
 
 export function Rail({ tone = 'neutral', children, className = '' }) {
   return (
-    <div className={`flex rounded-lg border border-black/5 bg-white shadow-sm overflow-hidden ${className}`}>
+    <div className={`flex rounded-lg bg-white shadow-[0_1px_2px_rgba(6,35,26,0.06)] hover:shadow-[0_4px_12px_rgba(6,35,26,0.08)] transition-shadow overflow-hidden ${className}`}>
       <div className={`w-1.5 shrink-0 ${RAIL_COLORS[tone]}`} />
       <div className="flex-1 min-w-0">{children}</div>
+    </div>
+  )
+}
+
+// Generic elevated surface for top-level summary boxes (metrics, form
+// panels, config fields) — same shadow language as Rail, no left stripe.
+export function Card({ children, className = '' }) {
+  return (
+    <div className={`rounded-lg bg-white shadow-[0_1px_2px_rgba(6,35,26,0.06)] ${className}`}>
+      {children}
     </div>
   )
 }
@@ -70,9 +81,9 @@ export function SectionHeader({ title, subtitle, action }) {
 
 export function Button({ children, variant = 'primary', className = '', ...props }) {
   const variants = {
-    primary: 'bg-accent text-white hover:bg-accent-700',
-    accent: 'bg-good text-white hover:bg-good-600',
-    good: 'bg-info text-white hover:bg-info/90',
+    primary: 'bg-ink text-white hover:bg-ink-700',
+    accent: 'bg-accent text-white hover:bg-accent-600',
+    good: 'bg-good text-white hover:opacity-90',
     bad: 'bg-bad text-white hover:opacity-90',
     ghost: 'bg-transparent text-ink border border-black/10 hover:bg-black/5',
   }
@@ -89,7 +100,7 @@ export function Button({ children, variant = 'primary', className = '', ...props
 export function Modal({ open, onClose, title, children, wide }) {
   if (!open) return null
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-deep/40 backdrop-blur-sm p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 backdrop-blur-sm p-4" onClick={onClose}>
       <div
         className={`w-full ${wide ? 'max-w-3xl' : 'max-w-md'} max-h-[90vh] overflow-y-auto rounded-xl bg-white shadow-2xl`}
         onClick={(e) => e.stopPropagation()}
