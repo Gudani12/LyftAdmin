@@ -1,8 +1,9 @@
 import React from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
+import { SignedIn, UserButton, useUser } from '@clerk/clerk-react'
 import {
   ShieldCheck, Car, Users, MapPin, Siren, Wallet, SlidersHorizontal,
-  MessageSquare, KeyRound, BarChart3, FileText, Bell, Search, ChevronDown,
+  MessageSquare, KeyRound, BarChart3, FileText, Bell, Search,
   Sparkles,
 } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
@@ -28,7 +29,7 @@ const NAV_GROUPS = [
   {
     label: 'Admin',
     items: [
-      { to: '/comms', label: 'Comms', icon: MessageSquare },
+      { to: '/comments', label: 'Comments', icon: MessageSquare },
       { to: '/admin-accounts', label: 'Admin accounts', icon: KeyRound },
       { to: '/reporting', label: 'Reporting', icon: BarChart3 },
       { to: '/content', label: 'Content', icon: FileText },
@@ -37,8 +38,18 @@ const NAV_GROUPS = [
 ]
 
 export default function Layout() {
-  const { currentAdmin, safety } = useData()
+  const { safety, currentAdmin } = useData()
+  const { user, isLoaded } = useUser()
   const openSOS = safety.sos.filter((s) => s.status === 'open').length
+
+  const displayName = user?.fullName || user?.firstName || currentAdmin?.name || 'Admin'
+  const initials = (user?.fullName || user?.firstName || currentAdmin?.name || 'Admin')
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
 
   return (
     <div className="flex min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(14,92,63,0.16),_transparent_25%),linear-gradient(180deg,#eef5f1_0%,#f5f7f6_100%)] text-ink">
@@ -102,11 +113,11 @@ export default function Layout() {
             <div className="rounded-2xl border border-white/10 bg-white/5 p-3 backdrop-blur-sm">
               <div className="flex items-center gap-3">
                 <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-mint to-accent text-xs font-bold text-ink shadow-lg shadow-emerald-500/20">
-                  {currentAdmin.name.split(' ').map((s) => s[0]).join('').slice(0, 2)}
+                  {initials || 'A'}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-semibold text-white">{currentAdmin.name}</div>
-                  <div className="truncate text-[11px] capitalize text-white/55">{currentAdmin.role.replace('_', ' ')}</div>
+                  <div className="truncate text-sm font-semibold text-white">{isLoaded ? displayName : currentAdmin?.name || 'Admin'}</div>
+                  <div className="truncate text-[11px] capitalize text-white/55">{currentAdmin?.role?.replace('_', ' ') || 'Administrator'}</div>
                 </div>
               </div>
             </div>
@@ -133,12 +144,19 @@ export default function Layout() {
                 <Bell size={17} />
                 {openSOS > 0 && <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-bad ring-2 ring-white" />}
               </div>
-              <button className="flex items-center gap-2 rounded-full border border-black/5 bg-white px-2 py-1.5 shadow-sm transition hover:shadow-md">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-accent-100 via-emerald-100 to-mint text-xs font-bold text-accent-700">
-                  {currentAdmin.name.split(' ').map((s) => s[0]).join('').slice(0, 2)}
+              <SignedIn>
+                <div className="flex items-center gap-2 rounded-full border border-black/5 bg-white px-1.5 py-1 shadow-sm transition hover:shadow-md">
+                  <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-accent-100 via-emerald-100 to-mint text-xs font-bold text-accent-700">
+                    {isLoaded && user?.imageUrl ? (
+                      <img src={user.imageUrl} alt={displayName} className="h-full w-full object-cover" />
+                    ) : (
+                      initials || 'A'
+                    )}
+                  </div>
+                  <span className="hidden text-sm font-medium text-ink md:inline">{isLoaded ? displayName : currentAdmin?.name || 'Admin'}</span>
+                  <UserButton afterSignOutUrl="/login" appearance={{ elements: { avatarBox: 'h-8 w-8' } }} />
                 </div>
-                <ChevronDown size={14} className="text-slate2" />
-              </button>
+              </SignedIn>
             </div>
           </div>
         </header>
