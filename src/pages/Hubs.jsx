@@ -1,9 +1,12 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { AlertCircle, Building2, Check, Crosshair, MapPin, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
+import { Circle, CircleMarker, MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet'
+import 'leaflet/dist/leaflet.css'
 import { useData } from '../context/DataContext.jsx'
 import { Button, EmptyState, Modal, SectionHeader, StatusBadge } from '../components/ui.jsx'
 
 const JOHANNESBURG = { latitude: -26.2041, longitude: 28.0473 }
+const SOUTH_AFRICA_CENTER = [-30.5595, 22.9375]
 const EMPTY_FORM = { name: '', address: '', latitude: JOHANNESBURG.latitude, longitude: JOHANNESBURG.longitude, radius: 500, status: 'active' }
 
 export default function Hubs() {
@@ -69,7 +72,7 @@ export default function Hubs() {
       </div>
       <Modal open={editing !== null} onClose={closeModal} title={editing === 'new' ? 'Create hub' : 'Edit hub'} wide>
         <form onSubmit={saveHub} className="space-y-5">
-          <div className="grid gap-4 md:grid-cols-2"><Field label="Hub name" value={form.name} required onChange={(value) => setForm({ ...form, name: value })} /><Field label="Address" value={form.address} required onChange={(value) => setForm({ ...form, address: value })} /></div>
+          <div className="grid gap-4 md:grid-cols-2"><Field label="Hub name" value={form.name} required onChange={(value) => setForm({ ...form, name: value })} /><AddressAutocomplete value={form.address} onChange={(value) => setForm({ ...form, address: value })} onSelect={(place) => setForm({ ...form, address: place.address, latitude: place.latitude, longitude: place.longitude })} /></div>
           <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]"><MapPicker form={form} setForm={setForm} /><div className="space-y-4"><div className="grid grid-cols-2 gap-3"><Field label="Latitude" type="number" step="0.00000001" value={form.latitude} required onChange={(value) => setForm({ ...form, latitude: value })} /><Field label="Longitude" type="number" step="0.00000001" value={form.longitude} required onChange={(value) => setForm({ ...form, longitude: value })} /></div><Field label="Radius (metres)" type="number" min="1" value={form.radius} required onChange={(value) => setForm({ ...form, radius: value })} /><label className="flex items-center justify-between rounded-xl border border-black/10 px-3.5 py-3 text-sm"><span><span className="block font-semibold">Hub enabled</span><span className="text-xs text-slate2">Allow trips to use this location</span></span><input type="checkbox" checked={form.status === 'active'} onChange={(event) => setForm({ ...form, status: event.target.checked ? 'active' : 'inactive' })} className="h-4 w-4 accent-accent" /></label></div></div>
           {message && <p className="text-sm text-bad">{message}</p>}<div className="flex justify-end gap-2 border-t border-black/5 pt-4"><Button type="button" variant="ghost" onClick={closeModal}>Cancel</Button><Button type="submit" variant="accent" disabled={saving || !form.name.trim() || !form.address.trim()}>{saving ? 'Saving...' : <><Check size={15} /> Save hub</>}</Button></div>
         </form>
@@ -80,5 +83,56 @@ export default function Hubs() {
 
 function Summary({ label, value, icon: Icon, tone = 'text-accent' }) { return <div className="rounded-2xl border border-black/5 bg-white p-4 shadow-sm"><div className="flex items-center justify-between"><span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate2">{label}</span><Icon size={17} className={tone} /></div><div className="mt-2 font-display text-2xl font-semibold">{value}</div></div> }
 function Field({ label, value, onChange, ...props }) { return <label className="block text-xs font-semibold uppercase tracking-[0.14em] text-slate2">{label}<input {...props} value={value} onChange={(event) => onChange(event.target.value)} className="mt-1.5 w-full rounded-xl border border-black/10 bg-white px-3 py-2.5 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-accent/40 focus:ring-4 focus:ring-accent/10" /></label> }
+function AddressAutocomplete({ value, onChange, onSelect }) {
+  const [suggestions, setSuggestions] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [focused, setFocused] = useState(false)
+  const apiKey = import.meta.env.VITE_GEOAPIFY_API_KEY
+
+  useEffect(() => {
+    if (!apiKey || value.trim().length < 3) { setSuggestions([]); return undefined }
+    const controller = new AbortController()
+    const timer = setTimeout(async () => {
+      setLoading(true)
+      try {
+        const params = new URLSearchParams({ text: value.trim(), filter: 'countrycode:za', limit: '5', apiKey })
+        const response = await fetch(`https://api.geoapify.com/v1/geocode/autocomplete?${params}`, { signal: controller.signal })
+        if (!response.ok) throw new Error('Address search failed')
+        const result = await response.json()
+        setSuggestions((result.features || []).map((feature) => ({
+          address: feature.properties.formatted,
+          latitude: Number(feature.properties.lat).toFixed(8),
+          longitude: Number(feature.properties.lon).toFixed(8),
+        })))
+      } catch (error) {
+        if (error.name !== 'AbortError') setSuggestions([])
+      } finally {
+        if (!controller.signal.aborted) setLoading(false)
+      }
+    }, 350)
+    return () => { clearTimeout(timer); controller.abort() }
+  }, [apiKey, value])
+
+  const choose = (suggestion) => { onSelect(suggestion); setSuggestions([]); setFocused(false) }
+  return <div className="relative"><label className="block text-xs font-semibold uppercase tracking-[0.14em] text-slate2">Address<input value={value} required onChange={(event) => onChange(event.target.value)} onFocus={() => setFocused(true)} onBlur={() => setTimeout(() => setFocused(false), 150)} placeholder="Search an address..." className="mt-1.5 w-full rounded-xl border border-black/10 bg-white px-3 py-2.5 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-accent/40 focus:ring-4 focus:ring-accent/10" /></label>{focused && (loading || suggestions.length > 0) && <div className="absolute left-0 right-0 top-[4.5rem] z-10 overflow-hidden rounded-xl border border-black/10 bg-white shadow-[0_14px_30px_rgba(15,23,42,0.12)]">{loading && <div className="px-3 py-2 text-xs text-slate2">Searching addresses...</div>}{suggestions.map((suggestion) => <button type="button" key={`${suggestion.latitude}-${suggestion.longitude}`} onMouseDown={() => choose(suggestion)} className="flex w-full items-start gap-2 px-3 py-2.5 text-left text-sm hover:bg-accent-50"><MapPin size={15} className="mt-0.5 shrink-0 text-accent" /><span>{suggestion.address}</span></button>)}</div>}</div>
+}
 function HubRow({ hub, onEdit, onToggle, onDelete }) { return <div className="flex flex-wrap items-center gap-4 px-5 py-4 transition hover:bg-slate-50"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-50 text-accent"><Building2 size={18} /></div><div className="min-w-[180px] flex-1"><div className="font-semibold">{hub.name}</div><div className="mt-0.5 text-sm text-slate2">{hub.address}</div></div><div className="hidden min-w-[170px] text-sm text-slate2 md:block"><div className="font-mono text-xs text-ink">{Number(hub.latitude).toFixed(6)}, {Number(hub.longitude).toFixed(6)}</div><div className="mt-1">{hub.radius} m radius</div></div><StatusBadge status={hub.status} /><div className="flex items-center gap-1"><button title="Edit hub" onClick={() => onEdit(hub)} className="rounded-lg p-2 text-slate2 hover:bg-accent-50 hover:text-accent"><Pencil size={16} /></button><button title={hub.status === 'active' ? 'Disable hub' : 'Enable hub'} onClick={() => onToggle(hub)} className="rounded-lg p-2 text-slate2 hover:bg-accent-50 hover:text-accent">{hub.status === 'active' ? <X size={16} /> : <Check size={16} />}</button><button title="Delete hub" onClick={() => onDelete(hub)} className="rounded-lg p-2 text-slate2 hover:bg-bad-bg hover:text-bad"><Trash2 size={16} /></button></div></div> }
-function MapPicker({ form, setForm }) { const handleMapClick = (event) => { const bounds = event.currentTarget.getBoundingClientRect(); const longitude = -180 + ((event.clientX - bounds.left) / bounds.width) * 360; const latitude = 85 - ((event.clientY - bounds.top) / bounds.height) * 170; setForm({ ...form, latitude: latitude.toFixed(8), longitude: longitude.toFixed(8) }) }; const left = `${((Number(form.longitude) + 180) / 360) * 100}%`; const top = `${((85 - Number(form.latitude)) / 170) * 100}%`; return <div><div className="mb-1.5 flex items-center justify-between"><label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate2">Map location</label><span className="flex items-center gap-1 text-xs text-slate2"><Crosshair size={13} /> Click to place</span></div><div onClick={handleMapClick} className="relative h-64 cursor-crosshair overflow-hidden rounded-xl border border-black/10 bg-[#dcebe2] bg-[linear-gradient(30deg,transparent_48%,rgba(255,255,255,0.7)_49%,rgba(255,255,255,0.7)_51%,transparent_52%),linear-gradient(150deg,transparent_48%,rgba(255,255,255,0.7)_49%,rgba(255,255,255,0.7)_51%,transparent_52%)] bg-[length:68px_68px]"><div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_35%,rgba(14,92,63,0.12)_100%)]" /><div className="absolute left-[18%] top-[24%] h-24 w-44 rotate-12 rounded-[45%] bg-[#b6d8c0]/80" /><div className="absolute bottom-[16%] right-[12%] h-20 w-36 -rotate-12 rounded-[45%] bg-[#b6d8c0]/70" /><div className="absolute -translate-x-1/2 -translate-y-full" style={{ left, top }}><MapPin size={30} fill="#0e5c3f" className="text-white drop-shadow-md" /></div><div className="absolute bottom-3 left-3 rounded-lg bg-white/85 px-2 py-1 text-[11px] font-medium text-slate2 backdrop-blur">South Africa region</div></div></div> }
+function MapPicker({ form, setForm }) {
+  const latitude = Number(form.latitude) || JOHANNESBURG.latitude
+  const longitude = Number(form.longitude) || JOHANNESBURG.longitude
+  const position = [latitude, longitude]
+  const geoapifyKey = import.meta.env.VITE_GEOAPIFY_API_KEY
+  const tileUrl = geoapifyKey ? `https://maps.geoapify.com/v1/tile/osm-bright-smooth/{z}/{x}/{y}.png?apiKey=${geoapifyKey}` : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+  return <div><div className="mb-1.5 flex items-center justify-between"><label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate2">Map location</label><span className="flex items-center gap-1 text-xs text-slate2"><Crosshair size={13} /> Click to place</span></div><div className="h-64 overflow-hidden rounded-xl border border-black/10"><MapContainer center={SOUTH_AFRICA_CENTER} zoom={5} minZoom={4} maxZoom={18} scrollWheelZoom className="h-full w-full"><TileLayer attribution='&copy; OpenStreetMap contributors &copy; Geoapify' url={tileUrl} /><MapClickHandler setForm={setForm} form={form} /><MapCenter position={position} /><Circle center={position} radius={Number(form.radius) || 500} pathOptions={{ color: '#0e5c3f', fillColor: '#6fefb4', fillOpacity: 0.22 }} /><CircleMarker center={position} radius={8} pathOptions={{ color: '#ffffff', weight: 3, fillColor: '#0e5c3f', fillOpacity: 1 }} /></MapContainer></div></div>
+}
+
+function MapClickHandler({ form, setForm }) {
+  useMapEvents({ click: (event) => setForm({ ...form, latitude: event.latlng.lat.toFixed(8), longitude: event.latlng.lng.toFixed(8) }) })
+  return null
+}
+
+function MapCenter({ position }) {
+  const map = useMap()
+  useEffect(() => { map.setView(position) }, [map, position[0], position[1]])
+  return null
+}
