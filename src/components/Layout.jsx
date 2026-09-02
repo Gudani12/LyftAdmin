@@ -3,7 +3,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { SignedIn, UserButton, useUser } from '@clerk/clerk-react'
 import {
   ShieldCheck, Car, Users, MapPin, Siren, Wallet, SlidersHorizontal,
-  MessageSquare, KeyRound, BarChart3, FileText, Bell, Search,
+  MessageSquare, KeyRound, BarChart3, FileText, Bell, Search, Building2,
   Sparkles,
 } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
@@ -33,6 +33,7 @@ const NAV_GROUPS = [
       { to: '/admin-accounts', label: 'Admin accounts', icon: KeyRound },
       { to: '/reporting', label: 'Reporting', icon: BarChart3 },
       { to: '/content', label: 'Content', icon: FileText },
+      { to: '/hubs', label: 'Hubs', icon: Building2 },
     ],
   },
 ]

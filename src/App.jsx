@@ -13,6 +13,7 @@ import Comments from './pages/Comments.jsx'
 import AdminAccounts from './pages/AdminAccounts.jsx'
 import Reporting from './pages/Reporting.jsx'
 import Content from './pages/Content.jsx'
+import Hubs from './pages/Hubs.jsx'
 import Auth from './pages/Auth.jsx'
 
 function RequireAuth({ children }) {
@@ -45,6 +46,7 @@ export default function App() {
         <Route path="/admin-accounts" element={<AdminAccounts />} />
         <Route path="/reporting" element={<Reporting />} />
         <Route path="/content" element={<Content />} />
+        <Route path="/hubs" element={<Hubs />} />
         <Route path="*" element={<Navigate to="/verification" replace />} />
       </Route>
       <Route path="*" element={<Navigate to="/login" replace />} />

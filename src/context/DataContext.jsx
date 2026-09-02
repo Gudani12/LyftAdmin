@@ -74,6 +74,9 @@ export function DataProvider({ children }) {
   const [notifications, setNotifications] = useState([]) // simulated outbound notifications
   const [driversLoading, setDriversLoading] = useState(false)
   const [driversError, setDriversError] = useState(null)
+  const [hubs, setHubs] = useState([])
+  const [hubsLoading, setHubsLoading] = useState(false)
+  const [hubsError, setHubsError] = useState(null)
 
   const loadDrivers = useCallback(async () => {
     setDriversLoading(true)
@@ -99,6 +102,48 @@ export function DataProvider({ children }) {
       ...log,
     ])
   }, [])
+
+  const loadHubs = useCallback(async () => {
+    setHubsLoading(true)
+    setHubsError(null)
+    const { data, error } = await supabase.from('hubs').select('*').order('name')
+    if (error) {
+      console.error('Failed to load hubs from Supabase', error)
+      setHubsError(error)
+    } else {
+      setHubs(data || [])
+    }
+    setHubsLoading(false)
+  }, [])
+
+  useEffect(() => {
+    loadHubs()
+  }, [loadHubs])
+
+  const createHub = useCallback(async (hub) => {
+    const { data, error } = await supabase.from('hubs').insert(hub).select().single()
+    if (error) return { error }
+    setHubs((list) => [...list, data].sort((a, b) => a.name.localeCompare(b.name)))
+    logAudit('Created hub', data.name)
+    return { data }
+  }, [logAudit])
+
+  const updateHub = useCallback(async (id, changes) => {
+    const { data, error } = await supabase.from('hubs').update({ ...changes, updated_at: new Date().toISOString() }).eq('id', id).select().single()
+    if (error) return { error }
+    setHubs((list) => list.map((hub) => hub.id === id ? data : hub).sort((a, b) => a.name.localeCompare(b.name)))
+    logAudit(changes.status ? `${changes.status === 'active' ? 'Enabled' : 'Disabled'} hub` : 'Updated hub', data.name)
+    return { data }
+  }, [logAudit])
+
+  const deleteHub = useCallback(async (id) => {
+    const hub = hubs.find((item) => item.id === id)
+    const { error } = await supabase.from('hubs').delete().eq('id', id)
+    if (error) return { error }
+    setHubs((list) => list.filter((item) => item.id !== id))
+    logAudit('Deleted hub', hub?.name || id)
+    return {}
+  }, [hubs, logAudit])
 
   const notify = useCallback((userName, title, body) => {
     setNotifications((n) => [
@@ -237,6 +282,7 @@ export function DataProvider({ children }) {
     deleteUser, deleteDriver,
     acknowledgeSOS, resolveSOS, forceEndTrip, refundTrip, retryFailedPayment, sendPushToUser, logAudit,
     driversLoading, driversError,
+    hubs, hubsLoading, hubsError, loadHubs, createHub, updateHub, deleteHub,
   }
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>
