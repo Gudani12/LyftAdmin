@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react'
-import { Car, Search, ShieldAlert, CheckCircle2, AlertTriangle, BadgeCheck, CircleDashed } from 'lucide-react'
+import { Car, Search, ShieldAlert, CheckCircle2, AlertTriangle, BadgeCheck, CircleDashed, Webhook } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
 import { DOC_TYPES } from '../data/mockData.js'
-import { Rail, StatusBadge, Button, Modal, SectionHeader, Planned, Card } from '../components/ui.jsx'
+import { Rail, StatusBadge, Button, Modal, SectionHeader, Card } from '../components/ui.jsx'
 
 const DRIVER_DOC_KEYS = ['drivers_licence', 'pdp', 'vehicle_registration', 'roadworthy', 'insurance']
 
@@ -39,6 +39,21 @@ export default function Drivers() {
         <SummaryCard label="Pending" value={summary.pending} tone="amber" icon={CircleDashed} />
         <SummaryCard label="Expired" value={summary.expired} tone="bad" icon={AlertTriangle} />
         <SummaryCard label="Risk checks" value={summary.risk} tone="info" icon={ShieldAlert} />
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        <Card className="border-amber/20 bg-amber-bg p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 text-amber-700" size={18} />
+            <div><div className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">Automatic document protection</div><p className="mt-1 text-sm text-amber-700">Expired document dates are detected when drivers load and automatically remove go-live access.</p></div>
+          </div>
+        </Card>
+        <Card className="border-info/20 bg-info-bg p-4">
+          <div className="flex items-start gap-3">
+            <Webhook className="mt-0.5 text-info" size={18} />
+            <div><div className="text-xs font-semibold uppercase tracking-[0.16em] text-info">Background check webhook</div><p className="mt-1 text-sm text-info">Status is read from Supabase fields updated by the screening provider.</p></div>
+          </div>
+        </Card>
       </div>
 
       {!driversLoading && !driversError && drivers.length > 0 && (
@@ -136,13 +151,6 @@ export default function Drivers() {
         </div>
       )}
 
-      <div className="mt-6">
-        <Planned items={[
-          'Document expiry auto-suspend (currently manual — expired insurance above shows a suspended example)',
-          'Background check integration status webhook',
-        ]} />
-      </div>
-
       <DriverModal driver={active} onClose={() => setActive(null)} onSetLive={setDriverLive} onRestore={restoreDriver} />
     </div>
   )
@@ -167,6 +175,7 @@ function DriverModal({ driver: d, onClose, onSetLive, onRestore }) {
             <span className="text-slate2">Background check</span>
             <StatusBadge status={d.backgroundCheck} />
           </div>
+          <div className="mt-2 text-xs text-slate2">{d.backgroundCheckProvider ? `Provider: ${d.backgroundCheckProvider}` : 'Provider webhook awaiting configuration'}{d.backgroundCheckUpdatedAt ? ` · Updated ${new Date(d.backgroundCheckUpdatedAt).toLocaleString()}` : ''}</div>
         </div>
 
         <div>

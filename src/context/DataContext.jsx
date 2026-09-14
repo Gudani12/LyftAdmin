@@ -21,7 +21,19 @@ const normalizeAdmin = (admin) => ({
   lastLogin: admin.last_login_at || admin.lastLogin || 'now',
 })
 
+const isExpired = (value) => value && new Date(value).getTime() < Date.now()
+
+const getDocumentExpiry = (driver, key) => (
+  driver.document_expiry?.[key] ||
+  driver.document_expiries?.[key] ||
+  driver.vehicle_details?.[`${key}_expiry`] ||
+  driver.vehicle_details?.[`${key}_expires_at`] ||
+  null
+)
+
 const normalizeDriver = (driver) => {
+  const expiredDocuments = ['drivers_licence', 'pdp', 'vehicle_registration', 'roadworthy', 'insurance']
+    .filter((key) => isExpired(getDocumentExpiry(driver, key)))
   const vehicles = Array.isArray(driver.vehicles)
     ? driver.vehicles
     : driver.vehicle_details && typeof driver.vehicle_details === 'object'
@@ -42,7 +54,7 @@ const normalizeDriver = (driver) => {
     name: driver.full_name || `${driver.first_name || ''} ${driver.last_name || ''}`.trim() || driver.email || `Driver ${driver.id}`,
     email: driver.email,
     phone: driver.phone_number,
-    status: driver.status || 'pending',
+    status: expiredDocuments.length > 0 && driver.status !== 'archived' ? 'suspended_expired_docs' : (driver.status || 'pending'),
     verified: driver.verified ?? false,
     profile_image_url: driver.profile_image_url,
     driver_license_url: driver.driver_license_url,
@@ -59,15 +71,17 @@ const normalizeDriver = (driver) => {
     is_online: driver.is_online,
     last_location_update: driver.last_location_update,
     clerk_id: driver.clerk_id,
-    liveApproved: driver.status === 'live' || driver.status === 'approved',
-    backgroundCheck: driver.verified ? 'clear' : 'pending',
+    liveApproved: expiredDocuments.length === 0 && (driver.status === 'live' || driver.status === 'approved'),
+    backgroundCheck: driver.background_check_status || (driver.verified ? 'clear' : 'pending'),
+    backgroundCheckUpdatedAt: driver.background_check_updated_at || null,
+    backgroundCheckProvider: driver.background_check_provider || null,
     vehicles,
     documents: {
-      drivers_licence: driver.driver_license_url ? 'approved' : 'pending',
-      pdp: driver.government_id_url ? 'approved' : 'pending',
-      vehicle_registration: driver.vehicle_details?.registration_url ? 'approved' : 'pending',
-      roadworthy: driver.vehicle_details?.roadworthy_url ? 'approved' : 'pending',
-      insurance: driver.vehicle_details?.insurance_url ? 'approved' : 'pending',
+      drivers_licence: isExpired(getDocumentExpiry(driver, 'drivers_licence')) ? 'expired' : driver.driver_license_url ? 'approved' : 'pending',
+      pdp: isExpired(getDocumentExpiry(driver, 'pdp')) ? 'expired' : driver.government_id_url ? 'approved' : 'pending',
+      vehicle_registration: isExpired(getDocumentExpiry(driver, 'vehicle_registration')) ? 'expired' : driver.vehicle_details?.registration_url ? 'approved' : 'pending',
+      roadworthy: isExpired(getDocumentExpiry(driver, 'roadworthy')) ? 'expired' : driver.vehicle_details?.roadworthy_url ? 'approved' : 'pending',
+      insurance: isExpired(getDocumentExpiry(driver, 'insurance')) ? 'expired' : driver.vehicle_details?.insurance_url ? 'approved' : 'pending',
     },
   }
 }
@@ -83,6 +97,13 @@ export function DataProvider({ children }) {
   const [failedPayments, setFailedPayments] = useState(initialFailedPayments)
   const [admins, setAdmins] = useState(initialAdmins)
   const [currentAdmin, setCurrentAdmin] = useState(CURRENT_ADMIN)
+  const [bannedIdentifiers, setBannedIdentifiers] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('lyft_banned_identifiers') || '[]')
+    } catch {
+      return []
+    }
+  })
   const [auditLog, setAuditLog] = useState([])
   const [notifications, setNotifications] = useState([]) // simulated outbound notifications
   const [driversLoading, setDriversLoading] = useState(false)
@@ -108,6 +129,10 @@ export function DataProvider({ children }) {
   useEffect(() => {
     loadDrivers()
   }, [loadDrivers])
+
+  useEffect(() => {
+    localStorage.setItem('lyft_banned_identifiers', JSON.stringify(bannedIdentifiers))
+  }, [bannedIdentifiers])
 
   useEffect(() => {
     if (!user?.id) return
@@ -252,6 +277,28 @@ export function DataProvider({ children }) {
     logAudit('Added admin note', userId)
   }, [logAudit])
 
+  const banIdentifier = useCallback((type, value, reason, target) => {
+    const normalizedValue = type === 'phone' ? value.replace(/\s/g, '') : value.trim()
+    if (!normalizedValue) return
+    const ban = {
+      id: `ban_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      type,
+      value: normalizedValue,
+      reason,
+      target,
+      createdAt: new Date().toISOString(),
+      createdBy: currentAdmin.name,
+    }
+    setBannedIdentifiers((list) => list.some((item) => item.type === type && item.value === normalizedValue) ? list : [ban, ...list])
+    logAudit(`Banned ${type}`, `${normalizedValue}${reason ? ' — ' + reason : ''}`)
+  }, [currentAdmin.name, logAudit])
+
+  const unbanIdentifier = useCallback((banId) => {
+    const ban = bannedIdentifiers.find((item) => item.id === banId)
+    setBannedIdentifiers((list) => list.filter((item) => item.id !== banId))
+    if (ban) logAudit(`Removed ${ban.type} ban`, ban.value)
+  }, [bannedIdentifiers, logAudit])
+
   const handleDeletionRequest = useCallback((userId, approve) => {
     setUsers((list) => list.map((u) => u.id === userId ? { ...u, deletionRequested: false, status: approve ? 'deleted' : u.status } : u))
     logAudit(approve ? 'Approved account deletion' : 'Declined deletion request', userId)
@@ -380,6 +427,7 @@ export function DataProvider({ children }) {
     verifications, drivers, users, trips, safety, payouts, failedPayments, admins, auditLog, notifications,
     decideVerification, bulkApprove, setDriverLive, setUserStatus, addUserNote, handleDeletionRequest,
     archiveUser, archiveDriver, restoreUser, restoreDriver, deleteUser, deleteDriver, archiveAdmin, restoreAdmin, deleteAdmin,
+    bannedIdentifiers, banIdentifier, unbanIdentifier,
     acknowledgeSOS, resolveSOS, forceEndTrip, refundTrip, retryFailedPayment, sendPushToUser, logAudit,
     driversLoading, driversError,
     hubs, hubsLoading, hubsError, loadHubs, createHub, updateHub, deleteHub,
