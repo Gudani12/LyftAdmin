@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react'
 import { ArrowUpRight, Download, TrendingUp, Users, Wallet, ShieldCheck } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
-import { SectionHeader, Button, Card, Planned } from '../components/ui.jsx'
+import { SectionHeader, Button, Card } from '../components/ui.jsx'
 
 const COMMISSION_RATE = 0.20
 
@@ -21,7 +21,7 @@ function downloadCSV(filename, csv) {
 }
 
 export default function Reporting() {
-  const { users, trips, verifications } = useData()
+  const { users, trips, verifications, drivers, payouts } = useData()
 
   const stats = useMemo(() => {
     const activeUsers = users.filter((u) => u.status === 'active').length
@@ -42,9 +42,60 @@ export default function Reporting() {
   const rejectionEntries = Object.entries(stats.rejectionReasons).sort((a, b) => b[1] - a[1])
   const maxReasonCount = rejectionEntries[0]?.[1] || 1
 
+  const timeSeries = useMemo(() => {
+    const days = Array.from({ length: 7 }, (_, index) => {
+      const date = new Date()
+      date.setHours(0, 0, 0, 0)
+      date.setDate(date.getDate() - (6 - index))
+      return date
+    })
+    return days.map((date) => {
+      const next = new Date(date)
+      next.setDate(next.getDate() + 1)
+      const dayTrips = trips.filter((trip) => trip.startedAt && new Date(trip.startedAt) >= date && new Date(trip.startedAt) < next).length
+      const dayVerifications = verifications.filter((item) => item.decidedAt && new Date(item.decidedAt) >= date && new Date(item.decidedAt) < next)
+      const signups = users.filter((user) => user.created_at && new Date(user.created_at) >= date && new Date(user.created_at) < next).length
+      return {
+        label: date.toLocaleDateString('en-ZA', { weekday: 'short' }),
+        trips: dayTrips,
+        approved: dayVerifications.filter((item) => item.status === 'approved').length,
+        rejected: dayVerifications.filter((item) => item.status === 'rejected').length,
+        signups,
+        hasSignupData: users.some((user) => user.created_at),
+      }
+    })
+  }, [trips, verifications, users])
+
+  const areaBreakdown = useMemo(() => {
+    const areas = [...new Set(trips.map((trip) => trip.pickup?.split(',').pop()?.trim()).filter(Boolean))]
+    return areas.map((area) => {
+      const demand = trips.filter((trip) => trip.pickup?.includes(area)).length
+      const supply = drivers.filter((driver) => {
+        const location = driver.area || driver.city || driver.location || driver.service_area
+        return location?.toLowerCase?.().includes(area.toLowerCase())
+      }).length
+      return { area, demand, supply }
+    }).sort((a, b) => b.demand - a.demand)
+  }, [trips, drivers])
+
   const exportTrips = () => {
     const rows = trips.map((t) => ({ id: t.id, status: t.status, rider: t.rider, driver: t.driver, pickup: t.pickup, dropoff: t.dropoff, fare: t.fare?.total || '', startedAt: t.startedAt }))
     downloadCSV('trips.csv', toCSV(rows, ['id', 'status', 'rider', 'driver', 'pickup', 'dropoff', 'fare', 'startedAt']))
+  }
+
+  const exportUsers = () => {
+    const rows = users.map((user) => ({ id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role, status: user.status, trips: user.trips, rating: user.rating }))
+    downloadCSV('users.csv', toCSV(rows, ['id', 'name', 'email', 'phone', 'role', 'status', 'trips', 'rating']))
+  }
+
+  const exportVerifications = () => {
+    const rows = verifications.map((item) => ({ id: item.id, user: item.userName, role: item.role, document: item.docType, status: item.status, submittedAt: item.submittedAt, decidedAt: item.decidedAt, reason: item.decisionReason }))
+    downloadCSV('verifications.csv', toCSV(rows, ['id', 'user', 'role', 'document', 'status', 'submittedAt', 'decidedAt', 'reason']))
+  }
+
+  const exportPayouts = () => {
+    const rows = payouts.map((payout) => ({ id: payout.id, driver: payout.driver, amount: payout.amount, status: payout.status, period: payout.period, method: payout.method, reason: payout.failReason }))
+    downloadCSV('payouts.csv', toCSV(rows, ['id', 'driver', 'amount', 'status', 'period', 'method', 'reason']))
   }
 
   const metrics = [
@@ -59,7 +110,12 @@ export default function Reporting() {
       <SectionHeader
         title="Reporting"
         subtitle="Key operating metrics, computed live from current data."
-        action={<Button variant="ghost" onClick={exportTrips}><Download size={14} /> Export trips CSV</Button>}
+        action={<div className="flex flex-wrap justify-end gap-2">
+          <Button variant="ghost" onClick={exportUsers}><Download size={14} /> Users CSV</Button>
+          <Button variant="ghost" onClick={exportVerifications}><Download size={14} /> Verifications CSV</Button>
+          <Button variant="ghost" onClick={exportPayouts}><Download size={14} /> Payouts CSV</Button>
+          <Button variant="accent" onClick={exportTrips}><Download size={14} /> Trips CSV</Button>
+        </div>}
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -119,14 +175,42 @@ export default function Reporting() {
         <SummaryTile label="Cancellation rate" value={`${stats.cancellationRate}%`} tone="amber" />
       </div>
 
-      <Planned items={[
-        'Signups and trips-per-day time series',
-        'Verification throughput over time (not just current totals)',
-        'Driver supply vs passenger demand by area',
-        'CSV export for users, verifications, and payouts (trips export is live above)',
-      ]} />
+      <div className="grid gap-4 xl:grid-cols-2">
+        <TimeSeriesCard title="Signups and trips per day" subtitle="Last 7 days" series={timeSeries} keys={['signups', 'trips']} colors={['bg-accent', 'bg-info']} labels={['Signups', 'Trips']} unavailable={!timeSeries[0]?.hasSignupData} />
+        <TimeSeriesCard title="Verification throughput" subtitle="Approved and rejected decisions per day" series={timeSeries} keys={['approved', 'rejected']} colors={['bg-good', 'bg-bad']} labels={['Approved', 'Rejected']} />
+      </div>
+
+      <Card className="p-5">
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate2">Market balance</p>
+            <h2 className="mt-2 font-display text-xl font-semibold text-ink">Driver supply vs passenger demand</h2>
+          </div>
+          <span className="text-xs text-slate2">Grouped by pickup area</span>
+        </div>
+        {areaBreakdown.length === 0 ? <p className="text-sm text-slate2">No trip area data available yet.</p> : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[34rem] text-left text-sm">
+              <thead className="border-b border-black/5 text-xs uppercase tracking-[0.14em] text-slate2"><tr><th className="pb-3">Area</th><th className="pb-3">Demand</th><th className="pb-3">Supply</th><th className="pb-3">Signal</th></tr></thead>
+              <tbody className="divide-y divide-black/5">{areaBreakdown.map((item) => <tr key={item.area}><td className="py-3 font-medium text-ink">{item.area}</td><td className="py-3">{item.demand} trips</td><td className="py-3">{item.supply || '—'} drivers</td><td className="py-3"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.supply === 0 ? 'bg-amber-bg text-amber-700' : item.demand > item.supply ? 'bg-bad-bg text-bad' : 'bg-good-bg text-good'}`}>{item.supply === 0 ? 'Supply data needed' : item.demand > item.supply ? 'Demand pressure' : 'Balanced'}</span></td></tr>)}</tbody>
+            </table>
+          </div>
+        )}
+      </Card>
     </div>
   )
+}
+
+function TimeSeriesCard({ title, subtitle, series, keys, colors, labels, unavailable }) {
+  const max = Math.max(...series.flatMap((item) => keys.map((key) => item[key])), 1)
+  return <Card className="p-5">
+    <div className="mb-4"><p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate2">Trend</p><h2 className="mt-2 font-display text-xl font-semibold text-ink">{title}</h2><p className="mt-1 text-xs text-slate2">{subtitle}</p></div>
+    {unavailable ? <p className="rounded-2xl border border-dashed border-black/10 bg-slate-50 p-4 text-sm text-slate2">Signup timestamps are not available in the current records.</p> : <>
+      <div className="flex h-40 items-end gap-2 border-b border-black/5 pb-2">{series.map((item) => <div key={item.label} className="flex h-full flex-1 items-end gap-1" title={`${item.label}: ${keys.map((key) => `${key} ${item[key]}`).join(', ')}`}>{keys.map((key, index) => <div key={key} className={`min-h-[3px] flex-1 rounded-t ${colors[index]}`} style={{ height: `${(item[key] / max) * 100}%` }} />)}</div>)}</div>
+      <div className="mt-2 flex justify-between text-[11px] text-slate2">{series.map((item) => <span key={item.label}>{item.label}</span>)}</div>
+      <div className="mt-4 flex flex-wrap gap-4 text-xs text-slate2">{labels.map((label, index) => <span key={label} className="inline-flex items-center gap-1.5"><i className={`h-2.5 w-2.5 rounded-sm ${colors[index]}`} />{label}</span>)}</div>
+    </>}
+  </Card>
 }
 
 function MetricCard({ label, value, detail, tone, Icon }) {
