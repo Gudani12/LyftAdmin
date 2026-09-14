@@ -162,7 +162,7 @@ export default function AdminAccounts() {
       </div>
 
       <div className="mt-6">
-        <Planned items={['Two-factor authentication on admin login', 'Automatic session timeout']} />
+        <Planned items={['Enable multi-factor authentication in Clerk for all admin accounts']} />
       </div>
     </div>
   )

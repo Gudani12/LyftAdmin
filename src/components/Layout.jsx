@@ -1,6 +1,6 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { SignedIn, UserButton, useUser } from '@clerk/clerk-react'
+import { SignedIn, UserButton, useAuth, useUser } from '@clerk/clerk-react'
 import {
   ShieldCheck, Car, Users, MapPin, Siren, Wallet, SlidersHorizontal,
   MessageSquare, KeyRound, BarChart3, FileText, Bell, Search, Building2,
@@ -43,7 +43,31 @@ const NAV_GROUPS = [
 export default function Layout() {
   const { safety, currentAdmin } = useData()
   const { user, isLoaded } = useUser()
+  const { signOut } = useAuth()
   const openSOS = safety.sos.filter((s) => s.status === 'open').length
+
+  useEffect(() => {
+    const idleTimeout = 30 * 60 * 1000
+    let timeoutId
+
+    const signOutAfterInactivity = () => {
+      signOut({ redirectUrl: '/login?reason=timeout' })
+    }
+
+    const resetIdleTimer = () => {
+      window.clearTimeout(timeoutId)
+      timeoutId = window.setTimeout(signOutAfterInactivity, idleTimeout)
+    }
+
+    const activityEvents = ['mousedown', 'keydown', 'scroll', 'touchstart']
+    activityEvents.forEach((eventName) => window.addEventListener(eventName, resetIdleTimer, { passive: true }))
+    resetIdleTimer()
+
+    return () => {
+      window.clearTimeout(timeoutId)
+      activityEvents.forEach((eventName) => window.removeEventListener(eventName, resetIdleTimer))
+    }
+  }, [signOut])
 
   const displayName = user?.fullName || user?.firstName || currentAdmin?.name || 'Admin'
   const initials = (user?.fullName || user?.firstName || currentAdmin?.name || 'Admin')

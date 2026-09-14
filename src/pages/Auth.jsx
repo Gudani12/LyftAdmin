@@ -108,7 +108,7 @@ export default function Auth() {
       <div className="mb-6 text-center">
         <div className="text-sm uppercase tracking-[0.3em] text-slate2">Lyft Admin</div>
         <h1 className="mt-3 text-3xl font-semibold text-ink">{route === 'register' ? 'Create your admin account' : 'Admin login'}</h1>
-        <p className="mt-2 text-sm text-slate2">Sign in with Clerk, then your admin profile will be created in Supabase.</p>
+        <p className="mt-2 text-sm text-slate2">Sign in with Clerk, then your admin profile will be created in Supabase. Multi-factor challenges are handled by Clerk when enabled for this admin workspace.</p>
       </div>
 
       <SignedIn>
