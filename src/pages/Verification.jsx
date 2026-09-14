@@ -1,17 +1,18 @@
 import React, { useMemo, useState } from 'react'
-import { FileImage, AlertTriangle, Copy, CheckCircle2 } from 'lucide-react'
+import { FileImage, AlertTriangle, Copy, CheckCircle2, Send } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
 import { DOC_TYPES, REJECTION_REASONS } from '../data/mockData.js'
-import { Rail, StatusBadge, Button, Modal, SectionHeader, EmptyState, Star, Planned, timeAgo, fmtDate } from '../components/ui.jsx'
+import { Rail, StatusBadge, Button, Modal, SectionHeader, EmptyState, Star, timeAgo, fmtDate } from '../components/ui.jsx'
 
 const LOW_RISK_TYPES = ['selfie', 'id_document']
 
 export default function Verification() {
-  const { verifications, decideVerification, bulkApprove } = useData()
+  const { verifications, decideVerification, bulkApprove, sendExpiryDigest } = useData()
   const [statusFilter, setStatusFilter] = useState('pending')
   const [typeFilter, setTypeFilter] = useState('all')
   const [active, setActive] = useState(null)
   const [selectedIds, setSelectedIds] = useState([])
+  const [digestSent, setDigestSent] = useState(false)
 
   const countsByType = useMemo(() => {
     const pending = verifications.filter((v) => v.status === 'pending' || v.status === 'resubmitted')
@@ -77,6 +78,9 @@ export default function Verification() {
           <div>
             <span className="font-semibold">{expiringSoon.length} approved document(s) expiring within 30 days: </span>
             {expiringSoon.map((v) => `${v.userName} (${DOC_TYPES.find((d) => d.key === v.docType)?.label}, expires ${fmtDate(v.expiresAt).split(',')[0]})`).join('; ')}
+            <Button variant="ghost" className="mt-2 !px-2 !py-1 text-xs" onClick={() => { sendExpiryDigest(expiringSoon); setDigestSent(true); setTimeout(() => setDigestSent(false), 2500) }}>
+              {digestSent ? <><CheckCircle2 size={12} /> Digest sent</> : <><Send size={12} /> Send admin digest</>}
+            </Button>
           </div>
         </div>
       )}
@@ -155,23 +159,26 @@ export default function Verification() {
         </div>
       )}
 
-      <div className="mt-6">
-        <Planned items={[
-          'Document expiry advance-warning digest (email/push to admins)',
-          'Full resubmission history timeline per user (shown inline in review modal today)',
-        ]} />
-      </div>
-
-      <ReviewModal verification={active} onClose={() => setActive(null)} onDecide={decideVerification} />
+      <ReviewModal verification={active} allVerifications={verifications} onClose={() => setActive(null)} onDecide={decideVerification} />
     </div>
   )
 }
 
-function ReviewModal({ verification: v, onClose, onDecide }) {
+function ReviewModal({ verification: v, allVerifications, onClose, onDecide }) {
   const [reason, setReason] = useState(REJECTION_REASONS[0])
   const [showReject, setShowReject] = useState(false)
 
   if (!v) return null
+
+  const userTimeline = allVerifications
+    .filter((item) => item.userId === v.userId || item.userName === v.userName)
+    .flatMap((item) => [
+      item.submittedAt ? { at: item.submittedAt, label: `Submitted ${DOC_TYPES.find((d) => d.key === item.docType)?.label || item.docType}`, tone: 'text-ink-700' } : null,
+      ...(item.resubmissionHistory || []).map((entry) => ({ at: entry.at, label: `Resubmitted after rejection: ${entry.reason}`, tone: 'text-bad' })),
+      item.decidedAt ? { at: item.decidedAt, label: `${item.status === 'approved' ? 'Approved' : 'Rejected'} ${DOC_TYPES.find((d) => d.key === item.docType)?.label || item.docType}${item.decisionReason ? `: ${item.decisionReason}` : ''}`, tone: item.status === 'approved' ? 'text-good' : 'text-bad' } : null,
+    ])
+    .filter(Boolean)
+    .sort((a, b) => new Date(a.at) - new Date(b.at))
 
   const decide = (decision) => {
     onDecide(v.id, decision, decision === 'rejected' ? reason : null)
@@ -188,16 +195,10 @@ function ReviewModal({ verification: v, onClose, onDecide }) {
             <FileImage size={32} />
             <span className="text-xs mt-2">{v.documentImage ? `${v.documentImage}.jpg` : 'No document on file'}</span>
           </div>
-          {v.resubmissionHistory?.length > 0 && (
-            <div className="mt-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate2 mb-2">Resubmission history</p>
-              <ul className="text-xs space-y-1.5">
-                {v.resubmissionHistory.map((r, i) => (
-                  <li key={i} className="text-ink-700">Rejected {timeAgo(r.at)} by {r.by} — {r.reason}</li>
-                ))}
-              </ul>
-            </div>
-          )}
+          <div className="mt-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate2 mb-2">User verification timeline</p>
+            {userTimeline.length === 0 ? <p className="text-xs text-slate2">No review history recorded yet.</p> : <ol className="space-y-2 border-l border-black/10 pl-3 text-xs">{userTimeline.map((event, index) => <li key={`${event.at}-${index}`} className="relative"><span className="absolute -left-[1.05rem] top-1 h-2 w-2 rounded-full bg-accent" /><div className={event.tone}>{event.label}</div><div className="mt-0.5 text-slate2">{fmtDate(event.at)}</div></li>)}</ol>}
+          </div>
         </div>
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-slate2 mb-2">Typed details</p>

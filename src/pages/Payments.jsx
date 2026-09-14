@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react'
-import { RefreshCw, Undo2, TrendingUp, DollarSign } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Plus, RefreshCw, ShieldAlert, Undo2, TrendingUp, DollarSign, ToggleLeft, ToggleRight } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
-import { Rail, StatusBadge, Button, SectionHeader, EmptyState, Planned, Modal, Card } from '../components/ui.jsx'
+import { Rail, StatusBadge, Button, SectionHeader, EmptyState, Modal, Card } from '../components/ui.jsx'
 
 const COMMISSION_RATE = 0.20
 
@@ -12,6 +12,39 @@ export default function Payments() {
   const [adjustAmount, setAdjustAmount] = useState('')
   const [adjustNote, setAdjustNote] = useState('')
   const [adjustDriver, setAdjustDriver] = useState('')
+  const [disputes, setDisputes] = useState([
+    { id: 'dp_1001', tripId: 'trp_5490', rider: 'Zanele Mahlangu', amount: 85, reason: 'Ride not as described', status: 'open', createdAt: '2026-09-12T08:30:00.000Z' },
+  ])
+  const [schedule, setSchedule] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('lyft_payout_schedule') || 'null') || { frequency: 'weekly', day: 'monday', minimum: '100' } } catch { return { frequency: 'weekly', day: 'monday', minimum: '100' } }
+  })
+  const [promos, setPromos] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('lyft_promo_codes') || '[]') } catch { return [] }
+  })
+  const [showPromo, setShowPromo] = useState(false)
+  const [promoForm, setPromoForm] = useState({ code: '', amount: '', limit: '' })
+
+  const saveSchedule = (next) => {
+    setSchedule(next)
+    localStorage.setItem('lyft_payout_schedule', JSON.stringify(next))
+    logAudit('Updated payout schedule', `${next.frequency} on ${next.day}, minimum R${next.minimum}`)
+  }
+
+  const updateDispute = (id, status) => {
+    setDisputes((list) => list.map((dispute) => dispute.id === id ? { ...dispute, status } : dispute))
+    logAudit('Updated payment dispute', `${id} — ${status}`)
+  }
+
+  const createPromo = () => {
+    if (!promoForm.code.trim() || !promoForm.amount) return
+    const promo = { id: `promo_${Date.now()}`, code: promoForm.code.trim().toUpperCase(), credit: Number(promoForm.amount), limit: Number(promoForm.limit) || null, active: true }
+    const next = [promo, ...promos]
+    setPromos(next)
+    localStorage.setItem('lyft_promo_codes', JSON.stringify(next))
+    logAudit('Created promo code', `${promo.code} — R${promo.credit} referral credit`)
+    setPromoForm({ code: '', amount: '', limit: '' })
+    setShowPromo(false)
+  }
 
   const completedTrips = trips.filter((t) => t.status === 'completed' && t.fare)
   const totalRevenue = completedTrips.reduce((sum, t) => sum + t.fare.total, 0)
@@ -121,8 +154,25 @@ export default function Payments() {
         </div>
       </div>
 
-      <div className="mt-6">
-        <Planned items={['Stripe dispute inbox', 'Payout schedule configuration', 'Promo codes and referral credit management']} />
+      <div className="grid gap-6 xl:grid-cols-3">
+        <Card className="p-5 xl:col-span-1">
+          <div className="mb-4 flex items-center gap-2"><ShieldAlert size={17} className="text-bad" /><h2 className="font-display font-semibold">Dispute inbox</h2></div>
+          <p className="mb-3 text-xs text-slate2">Stripe disputes are simulated until Stripe webhooks are connected.</p>
+          {disputes.length === 0 ? <EmptyState title="No disputes" /> : <div className="space-y-2">{disputes.map((dispute) => <div key={dispute.id} className="rounded-xl border border-black/5 bg-slate-50 p-3"><div className="flex items-start justify-between gap-2"><div><div className="text-sm font-medium">{dispute.rider}</div><div className="text-xs text-slate2">{dispute.id} · trip {dispute.tripId}</div></div><StatusBadge status={dispute.status} /></div><div className="mt-2 text-sm">R{dispute.amount} · {dispute.reason}</div><div className="mt-2 flex gap-1.5">{dispute.status === 'open' && <><Button variant="good" className="!px-2 !py-1 text-xs" onClick={() => updateDispute(dispute.id, 'accepted')}><CheckCircle2 size={12} /> Accept</Button><Button variant="ghost" className="!px-2 !py-1 text-xs" onClick={() => updateDispute(dispute.id, 'challenged')}><AlertTriangle size={12} /> Challenge</Button></>}</div></div>)}</div>}
+        </Card>
+
+        <Card className="p-5">
+          <div className="mb-4 flex items-center gap-2"><RefreshCw size={17} className="text-accent" /><h2 className="font-display font-semibold">Payout schedule</h2></div>
+          <label className="text-xs text-slate2">Frequency<select value={schedule.frequency} onChange={(event) => saveSchedule({ ...schedule, frequency: event.target.value })} className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm"><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="biweekly">Every two weeks</option><option value="monthly">Monthly</option></select></label>
+          <label className="mt-3 block text-xs text-slate2">Processing day<input value={schedule.day} onChange={(event) => saveSchedule({ ...schedule, day: event.target.value })} className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm" /></label>
+          <label className="mt-3 block text-xs text-slate2">Minimum payout (R)<input type="number" min="0" value={schedule.minimum} onChange={(event) => saveSchedule({ ...schedule, minimum: event.target.value })} className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm" /></label>
+          <p className="mt-3 text-xs text-slate2">Changes are saved locally until a payout provider is connected.</p>
+        </Card>
+
+        <Card className="p-5">
+          <div className="mb-4 flex items-center justify-between gap-2"><div className="flex items-center gap-2"><DollarSign size={17} className="text-good" /><h2 className="font-display font-semibold">Promo codes</h2></div><Button variant="accent" className="!px-2 !py-1 text-xs" onClick={() => setShowPromo(true)}><Plus size={12} /> Add</Button></div>
+          {promos.length === 0 ? <EmptyState title="No promo codes" hint="Create a referral credit code." /> : <div className="space-y-2">{promos.map((promo) => <div key={promo.id} className="flex items-center justify-between gap-2 rounded-xl border border-black/5 bg-slate-50 px-3 py-2.5"><div><div className="font-mono text-sm font-semibold">{promo.code}</div><div className="text-xs text-slate2">R{promo.credit} credit{promo.limit ? ` · ${promo.limit} uses` : ''}</div></div><button type="button" title={promo.active ? 'Disable promo code' : 'Enable promo code'} onClick={() => { const next = promos.map((item) => item.id === promo.id ? { ...item, active: !item.active } : item); setPromos(next); localStorage.setItem('lyft_promo_codes', JSON.stringify(next)); logAudit(`${promo.active ? 'Disabled' : 'Enabled'} promo code`, promo.code) }} className={promo.active ? 'text-good' : 'text-slate2'}>{promo.active ? <ToggleRight size={22} /> : <ToggleLeft size={22} />}</button></div>)}</div>}
+        </Card>
       </div>
 
       <Modal open={adjusting} onClose={() => setAdjusting(false)} title="Adjust driver balance">
@@ -145,6 +195,13 @@ export default function Payments() {
             Apply adjustment
           </Button>
         </div>
+      </Modal>
+
+      <Modal open={showPromo} onClose={() => setShowPromo(false)} title="Create promo code">
+        <label className="text-xs text-slate2">Code<input value={promoForm.code} onChange={(event) => setPromoForm({ ...promoForm, code: event.target.value })} placeholder="e.g. WELCOME50" className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm uppercase" /></label>
+        <label className="mt-3 block text-xs text-slate2">Referral credit (R)<input type="number" min="1" value={promoForm.amount} onChange={(event) => setPromoForm({ ...promoForm, amount: event.target.value })} className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm" /></label>
+        <label className="mt-3 block text-xs text-slate2">Usage limit (optional)<input type="number" min="1" value={promoForm.limit} onChange={(event) => setPromoForm({ ...promoForm, limit: event.target.value })} className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm" /></label>
+        <div className="mt-4 flex justify-end gap-2"><Button variant="ghost" onClick={() => setShowPromo(false)}>Cancel</Button><Button variant="accent" disabled={!promoForm.code.trim() || !promoForm.amount} onClick={createPromo}>Create code</Button></div>
       </Modal>
     </div>
   )

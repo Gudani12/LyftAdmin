@@ -41,7 +41,7 @@ const NAV_GROUPS = [
 ]
 
 export default function Layout() {
-  const { safety, currentAdmin } = useData()
+  const { safety, currentAdmin, outageBanner } = useData()
   const { user, isLoaded } = useUser()
   const { signOut } = useAuth()
   const openSOS = safety.sos.filter((s) => s.status === 'open').length
@@ -190,6 +190,15 @@ export default function Layout() {
 
         <main className="flex-1 overflow-y-auto p-5 md:p-6">
           <div className="mx-auto max-w-[1600px]">
+            {outageBanner && (
+              <div className="mb-5 flex items-start gap-3 rounded-2xl border border-amber/25 bg-amber-bg px-4 py-3 text-sm text-amber-700 shadow-sm">
+                <Bell size={17} className="mt-0.5 shrink-0" />
+                <div>
+                  <div className="font-semibold">{outageBanner.title}</div>
+                  <div className="mt-0.5">{outageBanner.message}</div>
+                </div>
+              </div>
+            )}
             <Outlet />
           </div>
         </main>

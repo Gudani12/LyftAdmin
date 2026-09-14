@@ -17,7 +17,29 @@ export default function Hubs() {
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
 
-  const filteredHubs = useMemo(() => hubs.filter((hub) => `${hub.name} ${hub.address}`.toLowerCase().includes(query.toLowerCase())), [hubs, query])
+  const filteredHubs = useMemo(() => {
+    const searchTerms = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
+    if (searchTerms.length === 0) return hubs
+
+    return hubs.filter((hub) => {
+      const searchableText = [
+        hub.id,
+        hub.name,
+        hub.address,
+        hub.city,
+        hub.region,
+        hub.description,
+        hub.latitude,
+        hub.longitude,
+      ]
+        .filter((value) => value !== null && value !== undefined)
+        .map(String)
+        .join(' ')
+        .toLowerCase()
+
+      return searchTerms.every((term) => searchableText.includes(term))
+    })
+  }, [hubs, query])
   const activeCount = hubs.filter((hub) => hub.status === 'active').length
 
   const openCreate = () => { setEditing('new'); setForm({ ...EMPTY_FORM }); setMessage('') }
@@ -66,7 +88,7 @@ export default function Hubs() {
       <div className="rounded-2xl border border-black/5 bg-white shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/5 px-5 py-4">
           <div><h2 className="font-display text-lg font-semibold">All hubs</h2><p className="text-sm text-slate2">{filteredHubs.length} of {hubs.length} locations</p></div>
-          <div className="relative w-full sm:w-72"><Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate2" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search hubs..." className="w-full rounded-xl border border-black/10 bg-slate-50 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-accent/40 focus:ring-4 focus:ring-accent/10" /></div>
+          <div className="relative w-full sm:w-72"><Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate2" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search name, address, city..." aria-label="Search hubs" className="w-full rounded-xl border border-black/10 bg-slate-50 py-2.5 pl-9 pr-16 text-sm outline-none focus:border-accent/40 focus:ring-4 focus:ring-accent/10" />{query && <button type="button" onClick={() => setQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg px-2 py-1 text-xs font-medium text-slate2 hover:bg-black/5 hover:text-ink">Clear</button>}</div>
         </div>
         {hubsLoading ? <div className="p-10 text-center text-sm text-slate2">Loading hubs...</div> : filteredHubs.length === 0 ? <div className="p-5"><EmptyState title={query ? 'No hubs match your search' : 'No hubs created yet'} hint={query ? 'Try a different name or address.' : 'Create the first hub to start managing service coverage.'} /></div> : <div className="divide-y divide-black/5">{filteredHubs.map((hub) => <HubRow key={hub.id} hub={hub} onEdit={openEdit} onToggle={toggleHub} onDelete={removeHub} />)}</div>}
       </div>
@@ -90,20 +112,28 @@ function AddressAutocomplete({ value, onChange, onSelect }) {
   const apiKey = import.meta.env.VITE_GEOAPIFY_API_KEY
 
   useEffect(() => {
-    if (!apiKey || value.trim().length < 3) { setSuggestions([]); return undefined }
+    if (value.trim().length < 3) { setSuggestions([]); return undefined }
     const controller = new AbortController()
     const timer = setTimeout(async () => {
       setLoading(true)
       try {
-        const params = new URLSearchParams({ text: value.trim(), filter: 'countrycode:za', limit: '5', apiKey })
-        const response = await fetch(`https://api.geoapify.com/v1/geocode/autocomplete?${params}`, { signal: controller.signal })
+        const endpoint = apiKey
+          ? `https://api.geoapify.com/v1/geocode/autocomplete?${new URLSearchParams({ text: value.trim(), filter: 'countrycode:za', limit: '5', apiKey })}`
+          : `https://nominatim.openstreetmap.org/search?${new URLSearchParams({ q: value.trim(), format: 'jsonv2', countrycodes: 'za', limit: '5', addressdetails: '1' })}`
+        const response = await fetch(endpoint, { signal: controller.signal, headers: apiKey ? undefined : { Accept: 'application/json' } })
         if (!response.ok) throw new Error('Address search failed')
         const result = await response.json()
-        setSuggestions((result.features || []).map((feature) => ({
-          address: feature.properties.formatted,
-          latitude: Number(feature.properties.lat).toFixed(8),
-          longitude: Number(feature.properties.lon).toFixed(8),
-        })))
+        setSuggestions(apiKey
+          ? (result.features || []).map((feature) => ({
+              address: feature.properties.formatted,
+              latitude: Number(feature.properties.lat).toFixed(8),
+              longitude: Number(feature.properties.lon).toFixed(8),
+            }))
+          : (result || []).map((place) => ({
+              address: place.display_name,
+              latitude: Number(place.lat).toFixed(8),
+              longitude: Number(place.lon).toFixed(8),
+            })))
       } catch (error) {
         if (error.name !== 'AbortError') setSuggestions([])
       } finally {

@@ -1,7 +1,7 @@
-import React, { useMemo, useState } from 'react'
-import { Navigation, Square, TrendingUp, Clock, CheckCircle2, XCircle } from 'lucide-react'
+import React, { useEffect, useMemo, useState } from 'react'
+import { Navigation, Pause, Play, RotateCcw, Square, TrendingUp, Clock, CheckCircle2, XCircle } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
-import { Rail, StatusBadge, Button, Modal, SectionHeader, EmptyState, Planned, fmtDate, Card } from '../components/ui.jsx'
+import { Rail, StatusBadge, Button, Modal, SectionHeader, EmptyState, fmtDate, Card } from '../components/ui.jsx'
 
 export default function Trips() {
   const { trips, forceEndTrip } = useData()
@@ -74,29 +74,66 @@ export default function Trips() {
         </div>
       )}
 
-      <div className="mt-6">
-        <Planned items={['Route replay from stored GPS pings (live map above uses start/end coordinates only)']} />
-      </div>
-
       <TripModal trip={active} onClose={() => setActive(null)} onForceEnd={forceEndTrip} />
     </div>
   )
 }
 
 function TripModal({ trip: t, onClose, onForceEnd }) {
+  const [replayIndex, setReplayIndex] = useState(0)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const routePoints = t?.gpsPings || t?.route || []
+  const canReplay = routePoints.length > 2
+
+  useEffect(() => {
+    setReplayIndex(0)
+    setIsPlaying(false)
+  }, [t?.id])
+
+  useEffect(() => {
+    if (!isPlaying || !canReplay) return undefined
+    const timer = window.setInterval(() => {
+      setReplayIndex((index) => {
+        if (index >= routePoints.length - 1) {
+          setIsPlaying(false)
+          return index
+        }
+        return index + 1
+      })
+    }, 700)
+    return () => window.clearInterval(timer)
+  }, [isPlaying, canReplay, routePoints.length])
+
   if (!t) return null
+
+  const mapPoints = routePoints.length > 0 ? routePoints : [[0, 0], [1, 1]]
+  const latitudes = mapPoints.map(([latitude]) => latitude)
+  const longitudes = mapPoints.map(([, longitude]) => longitude)
+  const minLat = Math.min(...latitudes)
+  const maxLat = Math.max(...latitudes)
+  const minLng = Math.min(...longitudes)
+  const maxLng = Math.max(...longitudes)
+  const toSvgPoint = ([latitude, longitude]) => `${12 + ((longitude - minLng) / Math.max(maxLng - minLng, 0.000001)) * 76},${88 - ((latitude - minLat) / Math.max(maxLat - minLat, 0.000001)) * 76}`
+  const svgRoute = mapPoints.map(toSvgPoint).join(' ')
+  const currentPoint = mapPoints[Math.min(replayIndex, mapPoints.length - 1)]
   return (
     <Modal open={!!t} onClose={onClose} title={`Trip ${t.id}`} wide>
       <div className="grid gap-6 md:grid-cols-2">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate2 mb-2">Route</p>
-          <div className="aspect-video rounded-2xl border border-black/5 bg-gradient-to-br from-deep-800 to-deep-900 text-white flex flex-col items-center justify-center text-xs gap-3 shadow-lg">
-            <Navigation size={24} className="text-accent" />
-            <div className="text-center">
-              <span className="block font-medium">{t.pickup}</span>
-              <span className="text-white/40 text-xs">↓</span>
-              <span className="block font-medium">{t.dropoff}</span>
+          <div className="overflow-hidden rounded-2xl border border-black/5 bg-[#0b211a] shadow-lg">
+            <svg viewBox="0 0 100 100" className="aspect-video w-full" role="img" aria-label="Trip route replay">
+              <path d="M0 25H100M0 50H100M0 75H100M25 0V100M50 0V100M75 0V100" stroke="rgba(255,255,255,0.08)" strokeWidth="0.5" />
+              <polyline points={svgRoute} fill="none" stroke="#6FEFB4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              {canReplay && <polyline points={mapPoints.slice(0, replayIndex + 1).map(toSvgPoint).join(' ')} fill="none" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />}
+              <circle cx={toSvgPoint(mapPoints[0]).split(',')[0]} cy={toSvgPoint(mapPoints[0]).split(',')[1]} r="2.5" fill="#6FEFB4" />
+              <circle cx={toSvgPoint(currentPoint).split(',')[0]} cy={toSvgPoint(currentPoint).split(',')[1]} r="3" fill="#ffffff" stroke="#0E5C3F" strokeWidth="1.5" />
+            </svg>
+            <div className="flex items-center justify-between gap-3 border-t border-white/10 px-3 py-2 text-xs text-white/70">
+              <span>{canReplay ? `GPS ping ${Math.min(replayIndex + 1, routePoints.length)} of ${routePoints.length}` : 'Start/end coordinates only'}</span>
+              {canReplay && <div className="flex gap-1.5"><Button variant="ghost" className="!border-white/15 !px-2 !py-1 !text-white hover:!bg-white/10" onClick={() => setReplayIndex(0)} title="Restart route replay"><RotateCcw size={12} /></Button><Button variant="ghost" className="!border-white/15 !px-2 !py-1 !text-white hover:!bg-white/10" onClick={() => setIsPlaying((playing) => !playing)}>{isPlaying ? <Pause size={12} /> : <Play size={12} />}{isPlaying ? 'Pause' : 'Play'}</Button></div>}
             </div>
+            {!canReplay && <div className="px-3 pb-3 text-[11px] text-white/50">No stored GPS pings are available for replay on this trip.</div>}
           </div>
           {t.status === 'cancelled' && (
             <div className="mt-3 text-sm">

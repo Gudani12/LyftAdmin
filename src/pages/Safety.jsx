@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react'
-import { Siren, Volume2, VolumeX, Star as StarIcon, Flag, AlertTriangle } from 'lucide-react'
+import { Siren, Volume2, VolumeX, Star as StarIcon, Flag, AlertTriangle, MessageSquare, ClipboardCheck, Phone } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
-import { Rail, StatusBadge, Button, Modal, SectionHeader, EmptyState, Planned, timeAgo, Card } from '../components/ui.jsx'
+import { Rail, StatusBadge, Button, Modal, SectionHeader, EmptyState, timeAgo, Card, fmtDate } from '../components/ui.jsx'
 
 function beep() {
   try {
@@ -18,10 +18,15 @@ function beep() {
 }
 
 export default function Safety() {
-  const { safety, acknowledgeSOS, resolveSOS } = useData()
+  const { safety, users, trips, acknowledgeSOS, resolveSOS, tripChats, incidentLog, recordIncident } = useData()
   const [muted, setMuted] = useState(false)
   const [resolving, setResolving] = useState(null)
   const [note, setNote] = useState('')
+  const [chatTrip, setChatTrip] = useState(null)
+  const [incidentTrip, setIncidentTrip] = useState(null)
+  const [incidentOutcome, setIncidentOutcome] = useState('Resolved - no further action')
+  const [incidentNotes, setIncidentNotes] = useState('')
+  const [contactTrip, setContactTrip] = useState(null)
   const lastOpenCount = useRef(0)
 
   const openSOS = safety.sos.filter((s) => s.status === 'open')
@@ -128,11 +133,17 @@ export default function Safety() {
         </div>
       </div>
 
-      <Planned items={[
-        'Trip chat access for dispute investigation',
-        'Incident log with recorded outcome',
-        'Emergency contact lookup for a user in an active trip',
-      ]} />
+      <div className="grid gap-6 xl:grid-cols-2">
+        <Card className="p-5">
+          <div className="mb-3 flex items-center gap-2"><MessageSquare size={17} className="text-info" /><h2 className="font-display font-semibold">Active trip investigation</h2></div>
+          {trips.filter((trip) => trip.status === 'in_progress').length === 0 ? <p className="text-sm text-slate2">No active trips available.</p> : <div className="space-y-2">{trips.filter((trip) => trip.status === 'in_progress').map((trip) => <div key={trip.id} className="flex items-center justify-between gap-3 rounded-xl border border-black/5 bg-slate-50 px-3 py-2.5"><div><div className="text-sm font-medium">{trip.id}</div><div className="text-xs text-slate2">{trip.rider} with {trip.driver}</div></div><div className="flex gap-1.5"><Button variant="ghost" className="!px-2 !py-1 text-xs" onClick={() => setChatTrip(trip)}>Chat</Button><Button variant="ghost" className="!px-2 !py-1 text-xs" onClick={() => setContactTrip(trip)}><Phone size={12} /> Contact</Button></div></div>)}</div>}
+        </Card>
+        <Card className="p-5">
+          <div className="mb-3 flex items-center gap-2"><ClipboardCheck size={17} className="text-accent" /><h2 className="font-display font-semibold">Incident outcomes</h2></div>
+          {incidentLog.length === 0 ? <p className="text-sm text-slate2">No incident outcomes recorded yet.</p> : <div className="space-y-2">{incidentLog.slice(0, 4).map((incident) => <div key={incident.id} className="rounded-xl border border-black/5 bg-slate-50 px-3 py-2.5 text-sm"><div className="font-medium">{incident.tripId} · {incident.outcome}</div><div className="mt-1 text-xs text-slate2">{incident.notes || 'No additional notes'} · {fmtDate(incident.recordedAt)}</div></div>)}</div>}
+          {trips.filter((trip) => trip.status === 'in_progress').length > 0 && <Button variant="accent" className="mt-3" onClick={() => setIncidentTrip(trips.find((trip) => trip.status === 'in_progress'))}><ClipboardCheck size={13} /> Record outcome</Button>}
+        </Card>
+      </div>
 
       <Modal open={!!resolving} onClose={() => setResolving(null)} title="Resolve SOS alert">
         <label className="text-xs text-slate2">Resolution note</label>
@@ -141,6 +152,21 @@ export default function Safety() {
           <Button variant="ghost" onClick={() => setResolving(null)}>Cancel</Button>
           <Button variant="good" onClick={() => { resolveSOS(resolving.id, note || 'Resolved by admin.'); setNote(''); setResolving(null) }}>Mark resolved</Button>
         </div>
+      </Modal>
+
+      <Modal open={!!chatTrip} onClose={() => setChatTrip(null)} title={`Trip chat · ${chatTrip?.id || ''}`}>
+        <div className="space-y-3">{(chatTrip && tripChats[chatTrip.id] || []).length === 0 ? <EmptyState title="No chat messages" hint="No messages are available for this trip." /> : tripChats[chatTrip.id].map((message) => <div key={message.id} className="rounded-xl border border-black/5 bg-slate-50 p-3"><div className="flex justify-between gap-2 text-sm font-medium"><span>{message.sender} <span className="text-xs font-normal capitalize text-slate2">({message.role})</span></span><span className="text-[11px] font-normal text-slate2">{timeAgo(message.at)}</span></div><p className="mt-1 text-sm text-ink-700">{message.message}</p></div>)}</div>
+      </Modal>
+
+      <Modal open={!!contactTrip} onClose={() => setContactTrip(null)} title="Emergency contact lookup">
+        {contactTrip && (() => { const user = users.find((item) => item.name === contactTrip.rider); const contact = user?.emergencyContact; return contact ? <div className="space-y-3"><div className="rounded-xl border border-bad/20 bg-bad-bg p-3 text-sm text-bad"><div className="font-semibold">Active trip: {contactTrip.id}</div><div className="mt-1">{contactTrip.rider} is currently travelling with {contactTrip.driver}.</div></div><div className="rounded-xl border border-black/5 bg-slate-50 p-4"><div className="text-xs uppercase tracking-[0.16em] text-slate2">Emergency contact</div><div className="mt-2 text-lg font-semibold">{contact.name}</div><div className="text-sm text-slate2">{contact.relationship}</div><a className="mt-3 inline-flex items-center gap-2 font-medium text-accent" href={`tel:${contact.phone}`}><Phone size={14} /> {contact.phone}</a></div></div> : <EmptyState title="No emergency contact recorded" hint="The user's profile does not contain an emergency contact." /> })()}
+      </Modal>
+
+      <Modal open={!!incidentTrip} onClose={() => setIncidentTrip(null)} title="Record incident outcome">
+        <label className="text-xs text-slate2">Trip</label><div className="mt-1 rounded-xl bg-slate-50 px-3 py-2 text-sm">{incidentTrip?.id} · {incidentTrip?.rider} with {incidentTrip?.driver}</div>
+        <label className="mt-4 block text-xs text-slate2">Outcome</label><select value={incidentOutcome} onChange={(event) => setIncidentOutcome(event.target.value)} className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm"><option>Resolved - no further action</option><option>Driver contacted</option><option>Rider contacted</option><option>Escalated to emergency services</option><option>Requires follow-up</option></select>
+        <label className="mt-4 block text-xs text-slate2">Notes</label><textarea value={incidentNotes} onChange={(event) => setIncidentNotes(event.target.value)} rows={3} className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm" placeholder="Record what happened and what was done..." />
+        <div className="mt-4 flex justify-end gap-2"><Button variant="ghost" onClick={() => setIncidentTrip(null)}>Cancel</Button><Button variant="accent" onClick={() => { recordIncident({ tripId: incidentTrip.id, outcome: incidentOutcome, notes: incidentNotes }); setIncidentNotes(''); setIncidentTrip(null) }}>Save outcome</Button></div>
       </Modal>
     </div>
   )

@@ -104,6 +104,38 @@ export function DataProvider({ children }) {
       return []
     }
   })
+  const [communicationTemplates, setCommunicationTemplates] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('lyft_communication_templates') || 'null') || {
+        approved: { subject: 'Document approved', message: 'Your {document} has been approved.' },
+        rejected: { subject: 'Document needs attention', message: 'Your {document} was not approved. Reason: {reason}' },
+      }
+    } catch {
+      return {
+        approved: { subject: 'Document approved', message: 'Your {document} has been approved.' },
+        rejected: { subject: 'Document needs attention', message: 'Your {document} was not approved. Reason: {reason}' },
+      }
+    }
+  })
+  const [outageBanner, setOutageBanner] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('lyft_outage_banner') || 'null')
+    } catch {
+      return null
+    }
+  })
+  const [incidentLog, setIncidentLog] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('lyft_incident_log') || '[]') } catch { return [] }
+  })
+  const [tripChats] = useState({
+    trp_5501: [
+      { id: 'msg_1', sender: 'Lerato Sithole', role: 'rider', message: 'I am at the pickup point.', at: new Date(Date.now() - 12 * 60000).toISOString() },
+      { id: 'msg_2', sender: 'Nomvula Khumalo', role: 'driver', message: 'I am two minutes away.', at: new Date(Date.now() - 10 * 60000).toISOString() },
+    ],
+    trp_5502: [
+      { id: 'msg_3', sender: 'Ryan Govender', role: 'rider', message: 'Please take the usual route.', at: new Date(Date.now() - 8 * 60000).toISOString() },
+    ],
+  })
   const [auditLog, setAuditLog] = useState([])
   const [notifications, setNotifications] = useState([]) // simulated outbound notifications
   const [driversLoading, setDriversLoading] = useState(false)
@@ -133,6 +165,19 @@ export function DataProvider({ children }) {
   useEffect(() => {
     localStorage.setItem('lyft_banned_identifiers', JSON.stringify(bannedIdentifiers))
   }, [bannedIdentifiers])
+
+  useEffect(() => {
+    localStorage.setItem('lyft_communication_templates', JSON.stringify(communicationTemplates))
+  }, [communicationTemplates])
+
+  useEffect(() => {
+    if (outageBanner) localStorage.setItem('lyft_outage_banner', JSON.stringify(outageBanner))
+    else localStorage.removeItem('lyft_outage_banner')
+  }, [outageBanner])
+
+  useEffect(() => {
+    localStorage.setItem('lyft_incident_log', JSON.stringify(incidentLog))
+  }, [incidentLog])
 
   useEffect(() => {
     if (!user?.id) return
@@ -212,7 +257,17 @@ export function DataProvider({ children }) {
   const decideVerification = useCallback((id, decision, reason) => {
     setVerifications((list) => list.map((v) => {
       if (v.id !== id) return v
-      const updated = { ...v, status: decision, decidedAt: new Date().toISOString(), decidedBy: `${CURRENT_ADMIN.role}: ${CURRENT_ADMIN.name}`, decisionReason: decision === 'rejected' ? reason : null }
+      const decidedAt = new Date().toISOString()
+      const updated = {
+        ...v,
+        status: decision,
+        decidedAt,
+        decidedBy: `${currentAdmin.role}: ${currentAdmin.name}`,
+        decisionReason: decision === 'rejected' ? reason : null,
+        resubmissionHistory: decision === 'rejected'
+          ? [...(v.resubmissionHistory || []), { at: decidedAt, reason, by: `${currentAdmin.role}: ${currentAdmin.name}` }]
+          : v.resubmissionHistory,
+      }
       return updated
     }))
     const v = verifications.find((x) => x.id === id)
@@ -226,7 +281,7 @@ export function DataProvider({ children }) {
           : `Your ${v.docType.replace(/_/g, ' ')} was rejected. Reason: ${reason}`
       )
     }
-  }, [verifications, logAudit, notify])
+  }, [verifications, currentAdmin, logAudit, notify])
 
   const bulkApprove = useCallback((ids) => {
     setVerifications((list) => list.map((v) => ids.includes(v.id) ? { ...v, status: 'approved', decidedAt: new Date().toISOString(), decidedBy: `${CURRENT_ADMIN.role}: ${CURRENT_ADMIN.name}` } : v))
@@ -422,12 +477,54 @@ export function DataProvider({ children }) {
     logAudit('Sent push notification', `${userName} — ${title}`)
   }, [notify, logAudit])
 
+  const sendExpiryDigest = useCallback((items) => {
+    const activeAdmins = admins.filter((admin) => (admin.status || 'active') === 'active')
+    const summary = items.map((item) => `${item.userName} — ${item.docType.replace(/_/g, ' ')} expires ${new Date(item.expiresAt).toLocaleDateString('en-ZA')}`).join('; ')
+    activeAdmins.forEach((admin) => notify(admin.name, 'Document expiry digest', `${items.length} approved document(s) expire within 30 days. ${summary}`))
+    logAudit('Sent document expiry digest', `${items.length} expiring documents to ${activeAdmins.length} admins`)
+    return activeAdmins.length
+  }, [admins, notify, logAudit])
+
+  const broadcastToSegment = useCallback((segment, city, title, body) => {
+    const audience = segment === 'drivers'
+      ? users.filter((user) => user.role === 'driver')
+      : users.filter((user) => !city || user.city?.toLowerCase() === city.toLowerCase())
+    audience.forEach((user) => notify(user.name, title, body))
+    logAudit('Broadcast notification', `${title} — ${segment}${city ? ` in ${city}` : ''} (${audience.length} recipients)`)
+    return audience.length
+  }, [users, notify, logAudit])
+
+  const saveCommunicationTemplate = useCallback((outcome, template) => {
+    setCommunicationTemplates((current) => ({ ...current, [outcome]: template }))
+    logAudit('Updated notification template', `${outcome} verification outcome`)
+  }, [logAudit])
+
+  const publishOutageBanner = useCallback((banner) => {
+    const nextBanner = { ...banner, id: `banner_${Date.now()}`, publishedAt: new Date().toISOString() }
+    setOutageBanner(nextBanner)
+    logAudit('Published outage banner', banner.title)
+  }, [logAudit])
+
+  const clearOutageBanner = useCallback(() => {
+    if (outageBanner) logAudit('Cleared outage banner', outageBanner.title)
+    setOutageBanner(null)
+  }, [outageBanner, logAudit])
+
+  const recordIncident = useCallback((incident) => {
+    const entry = { ...incident, id: `inc_${Date.now()}`, recordedAt: new Date().toISOString(), recordedBy: currentAdmin.name }
+    setIncidentLog((list) => [entry, ...list])
+    logAudit('Recorded safety incident outcome', `${incident.tripId} — ${incident.outcome}`)
+  }, [currentAdmin.name, logAudit])
+
   const value = {
     currentAdmin,
     verifications, drivers, users, trips, safety, payouts, failedPayments, admins, auditLog, notifications,
     decideVerification, bulkApprove, setDriverLive, setUserStatus, addUserNote, handleDeletionRequest,
     archiveUser, archiveDriver, restoreUser, restoreDriver, deleteUser, deleteDriver, archiveAdmin, restoreAdmin, deleteAdmin,
     bannedIdentifiers, banIdentifier, unbanIdentifier,
+    communicationTemplates, saveCommunicationTemplate, broadcastToSegment, sendExpiryDigest,
+    outageBanner, publishOutageBanner, clearOutageBanner,
+    incidentLog, recordIncident, tripChats,
     acknowledgeSOS, resolveSOS, forceEndTrip, refundTrip, retryFailedPayment, sendPushToUser, logAudit,
     driversLoading, driversError,
     hubs, hubsLoading, hubsError, loadHubs, createHub, updateHub, deleteHub,
