@@ -1,10 +1,10 @@
 import React, { useMemo, useState } from 'react'
-import { Search, Trash2, UserRound, ShieldAlert, CheckCircle2, ArrowUpRight } from 'lucide-react'
+import { Ban, Search, Trash2, UserRound, ShieldAlert, CheckCircle2, ArrowUpRight, XCircle } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
-import { Rail, StatusBadge, Button, Modal, SectionHeader, EmptyState, Star, Planned, Card } from '../components/ui.jsx'
+import { Rail, StatusBadge, Button, Modal, SectionHeader, EmptyState, Card } from '../components/ui.jsx'
 
 export default function UsersPage() {
-  const { users, currentAdmin, setUserStatus, addUserNote, handleDeletionRequest, archiveUser, restoreUser, deleteUser } = useData()
+  const { users, currentAdmin, setUserStatus, addUserNote, handleDeletionRequest, archiveUser, restoreUser, deleteUser, bannedIdentifiers, banIdentifier, unbanIdentifier } = useData()
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [roleFilter, setRoleFilter] = useState('all')
@@ -108,6 +108,13 @@ export default function UsersPage() {
                     <div className="hidden text-xs text-slate2 sm:block">{u.rating ? `★ ${u.rating}` : '—'}</div>
                     <StatusBadge status={u.status} />
                     <Button variant="ghost" onClick={() => setActive(u)}>Profile</Button>
+                    <Button variant="ghost" className="!px-2 !py-1 text-xs" onClick={() => {
+                      const reason = window.prompt(`Ban ${u.phone} from creating new accounts? Add a reason.`, 'Duplicate or abusive account')
+                      if (reason && reason.trim()) banIdentifier('phone', u.phone, reason.trim(), u.name)
+                    }}>
+                      <Ban size={12} />
+                      Ban phone
+                    </Button>
                     <Button variant="accent" className="!px-2 !py-1 text-xs" onClick={() => {
                       const reason = window.prompt(`Archive ${u.name}? Add the reason for archiving this account.`, 'Compliance review / duplicate record')
                       if (reason && reason.trim()) {
@@ -130,11 +137,28 @@ export default function UsersPage() {
         </div>
       )}
 
-      <div className="mt-6">
-        <Star /> <span className="ml-1 text-xs text-slate2">Ban by device/phone (cross-account) is planned:</span>
-        <div className="mt-2">
-          <Planned items={['Ban by device ID or phone number, blocking new signups tied to that identifier']} />
-        </div>
+      <div className="grid gap-6 lg:grid-cols-[1fr_1.2fr]">
+        <Card className="border-accent/15 bg-accent-50 p-5">
+          <div className="flex items-start gap-3">
+            <Ban className="mt-0.5 text-accent-700" size={18} />
+            <div>
+              <h2 className="font-display text-lg font-semibold text-ink">Block a device</h2>
+              <p className="mt-1 text-sm text-slate2">Register a device ID to prevent linked signups once backend enforcement is connected.</p>
+              <Button variant="accent" className="mt-4" onClick={() => {
+                const deviceId = window.prompt('Enter the device ID to block.')
+                const reason = deviceId && window.prompt('Add a reason for blocking this device.', 'Repeated abusive signups')
+                if (deviceId && reason && reason.trim()) banIdentifier('device', deviceId, reason.trim(), 'Manual device ban')
+              }}>Add device ban</Button>
+            </div>
+          </div>
+        </Card>
+        <Card className="p-5">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate2">Restricted identifiers</p><h2 className="mt-1 font-display text-lg font-semibold text-ink">Active bans</h2></div>
+            <span className="rounded-full bg-bad-bg px-2.5 py-1 text-xs font-semibold text-bad">{bannedIdentifiers.length}</span>
+          </div>
+          {bannedIdentifiers.length === 0 ? <p className="text-sm text-slate2">No phone numbers or devices are currently blocked.</p> : <div className="space-y-2">{bannedIdentifiers.map((ban) => <div key={ban.id} className="flex items-center justify-between gap-3 rounded-xl border border-black/5 bg-slate-50 px-3 py-2.5"><div className="min-w-0"><div className="flex items-center gap-2 text-sm font-medium text-ink"><Ban size={13} className="text-bad" />{ban.value}<span className="text-[11px] capitalize text-slate2">{ban.type}</span></div><div className="mt-1 truncate text-xs text-slate2">{ban.reason} · {ban.target}</div></div><Button variant="ghost" className="!px-2 !py-1 text-xs" onClick={() => unbanIdentifier(ban.id)}><XCircle size={12} /> Remove</Button></div>)}</div>}
+        </Card>
       </div>
 
       <UserModal user={active} onClose={() => setActive(null)} onSetStatus={setUserStatus} onAddNote={addUserNote} onRestore={restoreUser} />
