@@ -4,7 +4,7 @@ import { SignedIn, UserButton, useUser } from '@clerk/clerk-react'
 import {
   ShieldCheck, Car, Users, MapPin, Siren, Wallet, SlidersHorizontal,
   MessageSquare, KeyRound, BarChart3, FileText, Bell, Search, Building2,
-  Sparkles,
+  Sparkles, LayoutDashboard, Archive,
 } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
 
@@ -12,6 +12,7 @@ const NAV_GROUPS = [
   {
     label: 'Operations',
     items: [
+      { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
       { to: '/verification', label: 'Verification', icon: ShieldCheck },
       { to: '/drivers', label: 'Drivers', icon: Car },
       { to: '/users', label: 'Users', icon: Users },
@@ -31,6 +32,7 @@ const NAV_GROUPS = [
     items: [
       { to: '/comments', label: 'Comments', icon: MessageSquare },
       { to: '/admin-accounts', label: 'Admin accounts', icon: KeyRound },
+      { to: '/archived', label: 'Archived', icon: Archive },
       { to: '/reporting', label: 'Reporting', icon: BarChart3 },
       { to: '/content', label: 'Content', icon: FileText },
       { to: '/hubs', label: 'Hubs', icon: Building2 },

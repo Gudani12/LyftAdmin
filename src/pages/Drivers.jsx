@@ -7,7 +7,7 @@ import { Rail, StatusBadge, Button, Modal, SectionHeader, Planned, Card } from '
 const DRIVER_DOC_KEYS = ['drivers_licence', 'pdp', 'vehicle_registration', 'roadworthy', 'insurance']
 
 export default function Drivers() {
-  const { drivers, driversLoading, driversError, setDriverLive, deleteDriver } = useData()
+  const { drivers, currentAdmin, driversLoading, driversError, setDriverLive, archiveDriver, restoreDriver, deleteDriver } = useData()
   const [active, setActive] = useState(null)
 
   const summary = useMemo(() => {
@@ -83,9 +83,20 @@ export default function Drivers() {
                   <div className="flex items-center gap-3 md:justify-end">
                     <StatusBadge status={d.status} />
                     <Button variant="ghost" onClick={() => setActive(d)}>Details</Button>
-                    <Button variant="bad" className="!px-2 !py-1 text-xs" onClick={() => {
-                      if (window.confirm(`Delete driver ${d.name}? This cannot be undone.`)) deleteDriver(d.id)
-                    }}>Delete</Button>
+                    <Button variant="accent" className="!px-2 !py-1 text-xs" onClick={() => {
+                      const reason = window.prompt(`Archive ${d.name}? Add the reason for archiving this driver account.`, 'Policy violation / inactive account')
+                      if (reason && reason.trim()) {
+                        archiveDriver(d.id, reason.trim())
+                      }
+                    }}>Archive</Button>
+                    {currentAdmin?.role === 'super_admin' && (
+                      <Button variant="bad" className="!px-2 !py-1 text-xs" onClick={() => {
+                        const reason = window.prompt(`Delete ${d.name} permanently? Add a reason before permanent deletion.`, 'Fraudulent driver profile')
+                        if (reason && reason.trim()) {
+                          if (window.confirm(`This will permanently remove ${d.name}. Continue?`)) deleteDriver(d.id)
+                        }
+                      }}>Delete</Button>
+                    )}
                   </div>
                 </div>
               </Rail>
@@ -101,12 +112,12 @@ export default function Drivers() {
         ]} />
       </div>
 
-      <DriverModal driver={active} onClose={() => setActive(null)} onSetLive={setDriverLive} />
+      <DriverModal driver={active} onClose={() => setActive(null)} onSetLive={setDriverLive} onRestore={restoreDriver} />
     </div>
   )
 }
 
-function DriverModal({ driver: d, onClose, onSetLive }) {
+function DriverModal({ driver: d, onClose, onSetLive, onRestore }) {
   if (!d) return null
   return (
     <Modal open={!!d} onClose={onClose} title={d.name} wide>
@@ -148,7 +159,9 @@ function DriverModal({ driver: d, onClose, onSetLive }) {
       </div>
 
       <div className="mt-5 flex justify-end gap-2 border-t border-black/5 pt-4">
-        {d.liveApproved ? (
+        {d.status === 'archived' ? (
+          <Button variant="good" onClick={() => { onRestore(d.id); onClose() }}>Restore driver</Button>
+        ) : d.liveApproved ? (
           <Button variant="bad" onClick={() => { onSetLive(d.id, false); onClose() }}>Revoke access</Button>
         ) : (
           <Button variant="good" onClick={() => { onSetLive(d.id, true); onClose() }}>Approve to go live</Button>

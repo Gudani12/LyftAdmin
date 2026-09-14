@@ -22,6 +22,7 @@ const STATUS_STYLES = {
   resolved: 'bg-good-bg text-good border-good/30',
   investigating: 'bg-amber-bg text-amber-700 border-amber/30',
   deleted: 'bg-slate2-bg text-slate2 border-slate2/30',
+  archived: 'bg-slate2-bg text-slate2 border-slate2/30',
   clear: 'bg-good-bg text-good border-good/30',
   card_failed: 'bg-bad-bg text-bad border-bad/30',
   ok: 'bg-good-bg text-good border-good/30',

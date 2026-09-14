@@ -225,6 +225,18 @@ export function DataProvider({ children }) {
     logAudit(approve ? 'Approved account deletion' : 'Declined deletion request', userId)
   }, [logAudit])
 
+  const archiveUser = useCallback((userId, reason) => {
+    setUsers((list) => list.map((u) => u.id === userId ? { ...u, status: 'archived', notes: reason ? [...u.notes, `Archived: ${reason} (${new Date().toLocaleString()})`] : u.notes } : u))
+    const u = users.find((x) => x.id === userId)
+    logAudit('Archived user account', `${u?.name || userId}${reason ? ' — ' + reason : ''}`)
+  }, [users, logAudit])
+
+  const restoreUser = useCallback((userId) => {
+    setUsers((list) => list.map((u) => u.id === userId ? { ...u, status: 'active', notes: [...u.notes, `Restored: active state reinstated (${new Date().toLocaleString()})`] } : u))
+    const u = users.find((x) => x.id === userId)
+    logAudit('Restored user account', u?.name || userId)
+  }, [users, logAudit])
+
   const deleteUser = useCallback((userId) => {
     setUsers((list) => {
       const removed = list.find((u) => u.id === userId)
@@ -232,6 +244,40 @@ export function DataProvider({ children }) {
       return list.filter((u) => u.id !== userId)
     })
   }, [logAudit])
+
+  const deleteAdmin = useCallback((adminId) => {
+    setAdmins((list) => {
+      const removed = list.find((a) => a.id === adminId)
+      if (removed) logAudit('Deleted admin account', `${removed.name} (${removed.role})`)
+      return list.filter((a) => a.id !== adminId)
+    })
+  }, [logAudit])
+
+  const archiveDriver = useCallback((driverId, reason) => {
+    setDrivers((list) => list.map((d) => d.id === driverId ? {
+      ...d,
+      status: 'archived',
+      liveApproved: false,
+      is_online: false,
+      backgroundCheck: 'pending',
+      notes: reason ? [...(d.notes || []), `Archived: ${reason} (${new Date().toLocaleString()})`] : (d.notes || []),
+    } : d))
+    const d = drivers.find((x) => x.id === driverId)
+    logAudit('Archived driver account', `${d?.name || driverId}${reason ? ' — ' + reason : ''}`)
+  }, [drivers, logAudit])
+
+  const restoreDriver = useCallback((driverId) => {
+    setDrivers((list) => list.map((d) => d.id === driverId ? {
+      ...d,
+      status: 'pending_review',
+      liveApproved: false,
+      is_online: false,
+      backgroundCheck: 'pending',
+      notes: [...(d.notes || []), `Restored: pending review reinstated (${new Date().toLocaleString()})`],
+    } : d))
+    const d = drivers.find((x) => x.id === driverId)
+    logAudit('Restored driver account', d?.name || driverId)
+  }, [drivers, logAudit])
 
   const deleteDriver = useCallback(async (driverId) => {
     const { error } = await supabase.from('drivers').delete().eq('id', driverId)
@@ -279,7 +325,7 @@ export function DataProvider({ children }) {
     currentAdmin: CURRENT_ADMIN,
     verifications, drivers, users, trips, safety, payouts, failedPayments, admins, auditLog, notifications,
     decideVerification, bulkApprove, setDriverLive, setUserStatus, addUserNote, handleDeletionRequest,
-    deleteUser, deleteDriver,
+    archiveUser, archiveDriver, restoreUser, restoreDriver, deleteUser, deleteDriver, deleteAdmin,
     acknowledgeSOS, resolveSOS, forceEndTrip, refundTrip, retryFailedPayment, sendPushToUser, logAudit,
     driversLoading, driversError,
     hubs, hubsLoading, hubsError, loadHubs, createHub, updateHub, deleteHub,

@@ -4,7 +4,7 @@ import { useData } from '../context/DataContext.jsx'
 import { Rail, StatusBadge, Button, Modal, SectionHeader, EmptyState, Star, Planned, Card } from '../components/ui.jsx'
 
 export default function UsersPage() {
-  const { users, setUserStatus, addUserNote, handleDeletionRequest, deleteUser } = useData()
+  const { users, currentAdmin, setUserStatus, addUserNote, handleDeletionRequest, archiveUser, restoreUser, deleteUser } = useData()
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(null)
 
@@ -92,9 +92,20 @@ export default function UsersPage() {
                     <div className="hidden text-xs text-slate2 sm:block">{u.rating ? `★ ${u.rating}` : '—'}</div>
                     <StatusBadge status={u.status} />
                     <Button variant="ghost" onClick={() => setActive(u)}>Profile</Button>
-                    <Button variant="bad" className="!px-2 !py-1 text-xs" onClick={() => {
-                      if (window.confirm(`Delete user ${u.name}? This cannot be undone.`)) deleteUser(u.id)
-                    }}>Delete</Button>
+                    <Button variant="accent" className="!px-2 !py-1 text-xs" onClick={() => {
+                      const reason = window.prompt(`Archive ${u.name}? Add the reason for archiving this account.`, 'Compliance review / duplicate record')
+                      if (reason && reason.trim()) {
+                        archiveUser(u.id, reason.trim())
+                      }
+                    }}>Archive</Button>
+                    {currentAdmin?.role === 'super_admin' && (
+                      <Button variant="bad" className="!px-2 !py-1 text-xs" onClick={() => {
+                        const reason = window.prompt(`Delete ${u.name} permanently? Add a final reason before permanent deletion.`, 'Fraudulent account')
+                        if (reason && reason.trim()) {
+                          if (window.confirm(`This will permanently remove ${u.name}. Continue?`)) deleteUser(u.id)
+                        }
+                      }}>Delete</Button>
+                    )}
                   </div>
                 </div>
               </Rail>
@@ -110,12 +121,12 @@ export default function UsersPage() {
         </div>
       </div>
 
-      <UserModal user={active} onClose={() => setActive(null)} onSetStatus={setUserStatus} onAddNote={addUserNote} />
+      <UserModal user={active} onClose={() => setActive(null)} onSetStatus={setUserStatus} onAddNote={addUserNote} onRestore={restoreUser} />
     </div>
   )
 }
 
-function UserModal({ user: u, onClose, onSetStatus, onAddNote }) {
+function UserModal({ user: u, onClose, onSetStatus, onAddNote, onRestore }) {
   const [reason, setReason] = useState('')
   const [note, setNote] = useState('')
   const [showSuspendForm, setShowSuspendForm] = useState(false)
@@ -153,8 +164,10 @@ function UserModal({ user: u, onClose, onSetStatus, onAddNote }) {
 
       <div className="border-t border-black/5 pt-4">
         {!showSuspendForm ? (
-          <div className="flex justify-end">
-            {isSuspended ? (
+          <div className="flex justify-end gap-2">
+            {u.status === 'archived' ? (
+              <Button variant="good" onClick={() => { onRestore(u.id); onClose() }}>Restore account</Button>
+            ) : isSuspended ? (
               <Button variant="good" onClick={submitStatusChange}>Reactivate account</Button>
             ) : (
               <Button variant="bad" onClick={() => setShowSuspendForm(true)}>Suspend account</Button>

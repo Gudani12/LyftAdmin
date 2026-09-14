@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react'
+import { Trash2 } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
 import { ROLES } from '../data/mockData.js'
-import { SectionHeader, Rail, Planned, EmptyState, fmtDate, Card } from '../components/ui.jsx'
+import { SectionHeader, Rail, Planned, EmptyState, fmtDate, Card, Button } from '../components/ui.jsx'
 
 const ROLE_STYLES = {
   super_admin: 'bg-accent-50 text-accent-700 border-accent/30',
@@ -11,7 +12,7 @@ const ROLE_STYLES = {
 }
 
 export default function AdminAccounts() {
-  const { admins, auditLog } = useData()
+  const { admins, currentAdmin, auditLog, deleteAdmin } = useData()
   const [roleFilter, setRoleFilter] = useState('all')
 
   const filtered = roleFilter === 'all' ? admins : admins.filter((a) => a.role === roleFilter)
@@ -72,9 +73,25 @@ export default function AdminAccounts() {
                       </div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <span className={`inline-block rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize ${ROLE_STYLES[a.role]}`}>{a.role.replace('_', ' ')}</span>
-                    <div className="text-[11px] text-slate2 mt-1">{a.lastLogin === 'now' ? '✓ Now' : fmtDate(a.lastLogin)}</div>
+                  <div className="flex items-center gap-2">
+                    <div className="text-right">
+                      <span className={`inline-block rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize ${ROLE_STYLES[a.role]}`}>{a.role.replace('_', ' ')}</span>
+                      <div className="text-[11px] text-slate2 mt-1">{a.lastLogin === 'now' ? '✓ Now' : fmtDate(a.lastLogin)}</div>
+                    </div>
+                    {a.role !== 'super_admin' && currentAdmin?.role === 'super_admin' && (
+                      <Button
+                        variant="bad"
+                        className="!px-2 !py-1 text-[11px]"
+                        onClick={() => {
+                          if (window.confirm(`Delete admin ${a.name}? This action is permanent and will be logged.`)) {
+                            deleteAdmin(a.id)
+                          }
+                        }}
+                      >
+                        <Trash2 size={12} />
+                        Delete
+                      </Button>
+                    )}
                   </div>
                 </div>
               </Rail>

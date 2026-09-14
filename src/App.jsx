@@ -13,6 +13,8 @@ import Comments from './pages/Comments.jsx'
 import AdminAccounts from './pages/AdminAccounts.jsx'
 import Reporting from './pages/Reporting.jsx'
 import Content from './pages/Content.jsx'
+import Dashboard from './pages/Dashboard.jsx'
+import Archived from './pages/Archived.jsx'
 import Hubs from './pages/Hubs.jsx'
 import Auth from './pages/Auth.jsx'
 
@@ -34,7 +36,8 @@ export default function App() {
           </RequireAuth>
         }
       >
-        <Route index element={<Navigate to="/verification" replace />} />
+        <Route index element={<Navigate to="/dashboard" replace />} />
+        <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/verification" element={<Verification />} />
         <Route path="/drivers" element={<Drivers />} />
         <Route path="/users" element={<UsersPage />} />
@@ -44,10 +47,11 @@ export default function App() {
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/comments" element={<Comments />} />
         <Route path="/admin-accounts" element={<AdminAccounts />} />
+        <Route path="/archived" element={<Archived />} />
         <Route path="/reporting" element={<Reporting />} />
         <Route path="/content" element={<Content />} />
         <Route path="/hubs" element={<Hubs />} />
-        <Route path="*" element={<Navigate to="/verification" replace />} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Route>
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
