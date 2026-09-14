@@ -44,7 +44,7 @@ const createAdminRecord = async (user) => {
   }
 
   try {
-    const { data, error } = await supabase.from('admin').upsert(adminRecord, { onConflict: ['clerk_id'], returning: 'representation' })
+    const { data, error } = await supabase.from('admin').upsert(adminRecord, { onConflict: 'clerk_id' }).select().single()
     if (error) {
       const message = error.message || ''
       const rlsBlocked = /row-level security|permission denied|violates row-level security|policy/i.test(message)

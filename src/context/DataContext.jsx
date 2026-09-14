@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react'
+import { useUser } from '@clerk/clerk-react'
 import {
   initialVerifications, initialUsers, initialTrips,
   initialSafety, initialPayouts, initialFailedPayments, initialAdmins,
@@ -9,6 +10,16 @@ const DataContext = createContext(null)
 export const useData = () => useContext(DataContext)
 
 const CURRENT_ADMIN = { id: 'adm_5', name: 'You', role: 'super_admin' }
+
+const normalizeAdmin = (admin) => ({
+  id: admin.id || admin.clerk_id,
+  clerk_id: admin.clerk_id,
+  name: admin.full_name || admin.name || admin.email || 'Admin',
+  email: admin.email || '',
+  role: admin.role || 'support',
+  status: admin.status || 'active',
+  lastLogin: admin.last_login_at || admin.lastLogin || 'now',
+})
 
 const normalizeDriver = (driver) => {
   const vehicles = Array.isArray(driver.vehicles)
@@ -62,6 +73,7 @@ const normalizeDriver = (driver) => {
 }
 
 export function DataProvider({ children }) {
+  const { user } = useUser()
   const [verifications, setVerifications] = useState(initialVerifications)
   const [drivers, setDrivers] = useState([])
   const [users, setUsers] = useState(initialUsers)
@@ -70,6 +82,7 @@ export function DataProvider({ children }) {
   const [payouts, setPayouts] = useState(initialPayouts)
   const [failedPayments, setFailedPayments] = useState(initialFailedPayments)
   const [admins, setAdmins] = useState(initialAdmins)
+  const [currentAdmin, setCurrentAdmin] = useState(CURRENT_ADMIN)
   const [auditLog, setAuditLog] = useState([])
   const [notifications, setNotifications] = useState([]) // simulated outbound notifications
   const [driversLoading, setDriversLoading] = useState(false)
@@ -96,12 +109,31 @@ export function DataProvider({ children }) {
     loadDrivers()
   }, [loadDrivers])
 
+  useEffect(() => {
+    if (!user?.id) return
+
+    const loadCurrentAdmin = async () => {
+      const { data, error } = await supabase.from('admin').select('*').eq('clerk_id', user.id).maybeSingle()
+      if (error) {
+        console.error('Failed to load current admin profile from Supabase', error)
+        return
+      }
+      if (!data) return
+
+      const admin = normalizeAdmin(data)
+      setCurrentAdmin(admin)
+      setAdmins((list) => [admin, ...list.filter((item) => item.id !== CURRENT_ADMIN.id && item.clerk_id !== admin.clerk_id && item.id !== admin.id)])
+    }
+
+    loadCurrentAdmin()
+  }, [user?.id])
+
   const logAudit = useCallback((action, target) => {
     setAuditLog((log) => [
-      { id: `aud_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, admin: CURRENT_ADMIN.name, role: CURRENT_ADMIN.role, action, target, at: new Date().toISOString() },
+      { id: `aud_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, admin: currentAdmin.name, role: currentAdmin.role, action, target, at: new Date().toISOString() },
       ...log,
     ])
-  }, [])
+  }, [currentAdmin])
 
   const loadHubs = useCallback(async () => {
     setHubsLoading(true)
@@ -344,7 +376,7 @@ export function DataProvider({ children }) {
   }, [notify, logAudit])
 
   const value = {
-    currentAdmin: CURRENT_ADMIN,
+    currentAdmin,
     verifications, drivers, users, trips, safety, payouts, failedPayments, admins, auditLog, notifications,
     decideVerification, bulkApprove, setDriverLive, setUserStatus, addUserNote, handleDeletionRequest,
     archiveUser, archiveDriver, restoreUser, restoreDriver, deleteUser, deleteDriver, archiveAdmin, restoreAdmin, deleteAdmin,
