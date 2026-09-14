@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react'
-import { Car, ShieldAlert, CheckCircle2, AlertTriangle, BadgeCheck, CircleDashed } from 'lucide-react'
+import { Car, Search, ShieldAlert, CheckCircle2, AlertTriangle, BadgeCheck, CircleDashed } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
 import { DOC_TYPES } from '../data/mockData.js'
 import { Rail, StatusBadge, Button, Modal, SectionHeader, Planned, Card } from '../components/ui.jsx'
@@ -9,6 +9,8 @@ const DRIVER_DOC_KEYS = ['drivers_licence', 'pdp', 'vehicle_registration', 'road
 export default function Drivers() {
   const { drivers, currentAdmin, driversLoading, driversError, setDriverLive, archiveDriver, restoreDriver, deleteDriver } = useData()
   const [active, setActive] = useState(null)
+  const [query, setQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
 
   const summary = useMemo(() => {
     if (!drivers.length) return { live: 0, pending: 0, expired: 0, risk: 0 }
@@ -20,6 +22,14 @@ export default function Drivers() {
     }
   }, [drivers])
 
+  const filteredDrivers = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return drivers.filter((d) => (
+      (statusFilter === 'all' || d.status === statusFilter) &&
+      (!q || d.name.toLowerCase().includes(q) || d.email?.toLowerCase().includes(q) || d.phone?.includes(q) || d.vehicles.some((v) => v.plate?.toLowerCase().includes(q)))
+    ))
+  }, [drivers, query, statusFilter])
+
   return (
     <div className="space-y-6">
       <SectionHeader title="Drivers" subtitle="Document status, vehicles, and go-live approval." />
@@ -30,6 +40,23 @@ export default function Drivers() {
         <SummaryCard label="Expired" value={summary.expired} tone="bad" icon={AlertTriangle} />
         <SummaryCard label="Risk checks" value={summary.risk} tone="info" icon={ShieldAlert} />
       </div>
+
+      {!driversLoading && !driversError && drivers.length > 0 && (
+        <div className="grid gap-3 rounded-2xl border border-black/5 bg-white p-3 shadow-[0_10px_24px_rgba(15,23,42,0.03)] md:grid-cols-[1fr_auto]">
+          <div className="relative">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate2" />
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search driver, email, phone, or plate..." className="w-full rounded-xl border border-black/10 bg-slate-50 pl-9 pr-3 py-2.5 text-sm outline-none transition focus:border-accent/40 focus:ring-4 focus:ring-accent/10" />
+          </div>
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="rounded-xl border border-black/10 bg-slate-50 px-3 py-2.5 text-sm capitalize outline-none focus:border-accent/40 focus:ring-4 focus:ring-accent/10">
+            <option value="all">All statuses</option>
+            <option value="live">Live</option>
+            <option value="pending">Pending</option>
+            <option value="pending_review">Pending review</option>
+            <option value="archived">Archived</option>
+            <option value="revoked">Revoked</option>
+          </select>
+        </div>
+      )}
 
       {driversLoading ? (
         <div className="rounded-2xl border border-black/5 bg-white px-6 py-8 text-center text-sm text-slate2 shadow-[0_10px_24px_rgba(15,23,42,0.03)]">
@@ -43,9 +70,13 @@ export default function Drivers() {
         <div className="rounded-2xl border border-black/5 bg-white px-6 py-8 text-center text-sm text-slate2 shadow-[0_10px_24px_rgba(15,23,42,0.03)]">
           No drivers found in the database. Confirm the Supabase `drivers` table exists and you have active rows.
         </div>
+      ) : filteredDrivers.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-black/10 bg-white px-6 py-10 text-center text-sm text-slate2">
+          No drivers match the current search and status filter.
+        </div>
       ) : (
         <div className="space-y-3">
-          {drivers.map((d) => {
+          {filteredDrivers.map((d) => {
             const allApproved = DRIVER_DOC_KEYS.every((k) => d.documents[k] === 'approved')
             const hasExpired = DRIVER_DOC_KEYS.some((k) => d.documents[k] === 'expired')
             const tone = hasExpired ? 'urgent' : d.liveApproved ? 'ok' : allApproved ? 'info' : 'warn'

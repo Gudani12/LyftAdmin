@@ -253,6 +253,28 @@ export function DataProvider({ children }) {
     })
   }, [logAudit])
 
+  const archiveAdmin = useCallback((adminId, reason) => {
+    setAdmins((list) => list.map((a) => a.id === adminId ? {
+      ...a,
+      status: 'archived',
+      archiveReason: reason,
+      archivedAt: new Date().toISOString(),
+    } : a))
+    const admin = admins.find((a) => a.id === adminId)
+    logAudit('Archived admin account', `${admin?.name || adminId}${reason ? ' — ' + reason : ''}`)
+  }, [admins, logAudit])
+
+  const restoreAdmin = useCallback((adminId) => {
+    setAdmins((list) => list.map((a) => a.id === adminId ? {
+      ...a,
+      status: 'active',
+      archiveReason: null,
+      archivedAt: null,
+    } : a))
+    const admin = admins.find((a) => a.id === adminId)
+    logAudit('Restored admin account', admin?.name || adminId)
+  }, [admins, logAudit])
+
   const archiveDriver = useCallback((driverId, reason) => {
     setDrivers((list) => list.map((d) => d.id === driverId ? {
       ...d,
@@ -325,7 +347,7 @@ export function DataProvider({ children }) {
     currentAdmin: CURRENT_ADMIN,
     verifications, drivers, users, trips, safety, payouts, failedPayments, admins, auditLog, notifications,
     decideVerification, bulkApprove, setDriverLive, setUserStatus, addUserNote, handleDeletionRequest,
-    archiveUser, archiveDriver, restoreUser, restoreDriver, deleteUser, deleteDriver, deleteAdmin,
+    archiveUser, archiveDriver, restoreUser, restoreDriver, deleteUser, deleteDriver, archiveAdmin, restoreAdmin, deleteAdmin,
     acknowledgeSOS, resolveSOS, forceEndTrip, refundTrip, retryFailedPayment, sendPushToUser, logAudit,
     driversLoading, driversError,
     hubs, hubsLoading, hubsError, loadHubs, createHub, updateHub, deleteHub,

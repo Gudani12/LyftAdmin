@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from 'react'
-import { Trash2 } from 'lucide-react'
+import { Archive, ArchiveRestore, Search, Trash2 } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
 import { ROLES } from '../data/mockData.js'
-import { SectionHeader, Rail, Planned, EmptyState, fmtDate, Card, Button } from '../components/ui.jsx'
+import { SectionHeader, Rail, Planned, EmptyState, fmtDate, Card, Button, StatusBadge } from '../components/ui.jsx'
 
 const ROLE_STYLES = {
   super_admin: 'bg-accent-50 text-accent-700 border-accent/30',
@@ -12,10 +12,17 @@ const ROLE_STYLES = {
 }
 
 export default function AdminAccounts() {
-  const { admins, currentAdmin, auditLog, deleteAdmin } = useData()
+  const { admins, currentAdmin, auditLog, archiveAdmin, restoreAdmin, deleteAdmin } = useData()
   const [roleFilter, setRoleFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [query, setQuery] = useState('')
 
-  const filtered = roleFilter === 'all' ? admins : admins.filter((a) => a.role === roleFilter)
+  const filtered = admins.filter((a) => {
+    const q = query.trim().toLowerCase()
+    return (roleFilter === 'all' || a.role === roleFilter) &&
+      (statusFilter === 'all' || (a.status || 'active') === statusFilter) &&
+      (!q || a.name.toLowerCase().includes(q) || a.email.toLowerCase().includes(q))
+  })
   const summary = useMemo(() => ({
     total: admins.length,
     active: admins.filter((a) => a.lastLogin === 'now').length,
@@ -47,6 +54,17 @@ export default function AdminAccounts() {
 
       <div className="grid md:grid-cols-2 gap-6">
         <div>
+          <div className="mb-3 grid gap-3 md:grid-cols-[1fr_auto]">
+            <div className="relative">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate2" />
+              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search admin name or email..." className="w-full rounded-xl border border-black/10 bg-white pl-9 pr-3 py-2.5 text-sm outline-none transition focus:border-accent/40 focus:ring-4 focus:ring-accent/10" />
+            </div>
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="rounded-xl border border-black/10 bg-white px-3 py-2.5 text-sm capitalize outline-none focus:border-accent/40 focus:ring-4 focus:ring-accent/10">
+              <option value="all">All statuses</option>
+              <option value="active">Active</option>
+              <option value="archived">Archived</option>
+            </select>
+          </div>
           <div className="flex items-center gap-1.5 mb-4 flex-wrap">
             {['all', ...ROLES].map((r) => (
               <button
@@ -78,20 +96,43 @@ export default function AdminAccounts() {
                       <span className={`inline-block rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize ${ROLE_STYLES[a.role]}`}>{a.role.replace('_', ' ')}</span>
                       <div className="text-[11px] text-slate2 mt-1">{a.lastLogin === 'now' ? '✓ Now' : fmtDate(a.lastLogin)}</div>
                     </div>
-                    {a.role !== 'super_admin' && currentAdmin?.role === 'super_admin' && (
-                      <Button
-                        variant="bad"
-                        className="!px-2 !py-1 text-[11px]"
-                        onClick={() => {
-                          if (window.confirm(`Delete admin ${a.name}? This action is permanent and will be logged.`)) {
-                            deleteAdmin(a.id)
-                          }
-                        }}
-                      >
-                        <Trash2 size={12} />
-                        Delete
-                      </Button>
-                    )}
+                    {a.status === 'archived' ? (
+                      <div className="flex items-center gap-2">
+                        <StatusBadge status="archived" />
+                        {currentAdmin?.role === 'super_admin' && (
+                          <Button variant="good" className="!px-2 !py-1 text-[11px]" onClick={() => restoreAdmin(a.id)}>
+                            <ArchiveRestore size={12} />
+                            Restore
+                          </Button>
+                        )}
+                      </div>
+                    ) : a.role !== 'super_admin' && currentAdmin?.role === 'super_admin' ? (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="accent"
+                          className="!px-2 !py-1 text-[11px]"
+                          onClick={() => {
+                            const reason = window.prompt(`Archive ${a.name}? Add the reason for archiving this admin account.`, 'Role change / no longer active')
+                            if (reason && reason.trim()) archiveAdmin(a.id, reason.trim())
+                          }}
+                        >
+                          <Archive size={12} />
+                          Archive
+                        </Button>
+                        <Button
+                          variant="bad"
+                          className="!px-2 !py-1 text-[11px]"
+                          onClick={() => {
+                            if (window.confirm(`Delete admin ${a.name}? This action is permanent and will be logged.`)) {
+                              deleteAdmin(a.id)
+                            }
+                          }}
+                        >
+                          <Trash2 size={12} />
+                          Delete
+                        </Button>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               </Rail>

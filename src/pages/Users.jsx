@@ -6,18 +6,21 @@ import { Rail, StatusBadge, Button, Modal, SectionHeader, EmptyState, Star, Plan
 export default function UsersPage() {
   const { users, currentAdmin, setUserStatus, addUserNote, handleDeletionRequest, archiveUser, restoreUser, deleteUser } = useData()
   const [query, setQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [roleFilter, setRoleFilter] = useState('all')
   const [active, setActive] = useState(null)
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return users
     return users.filter((u) =>
-      u.name.toLowerCase().includes(q) ||
-      u.email.toLowerCase().includes(q) ||
-      u.phone.replace(/\s/g, '').includes(q.replace(/\s/g, '')) ||
-      u.idNumber.includes(q)
+      (statusFilter === 'all' || u.status === statusFilter) &&
+      (roleFilter === 'all' || u.role === roleFilter) &&
+      (!q || u.name.toLowerCase().includes(q) ||
+        u.email.toLowerCase().includes(q) ||
+        u.phone.replace(/\s/g, '').includes(q.replace(/\s/g, '')) ||
+        u.idNumber.includes(q))
     )
-  }, [users, query])
+  }, [users, query, statusFilter, roleFilter])
 
   const deletionRequests = users.filter((u) => u.deletionRequested)
   const summary = useMemo(() => {
@@ -39,14 +42,27 @@ export default function UsersPage() {
         <SummaryCard label="Drivers" value={summary.drivers} tone="accent" icon={ArrowUpRight} />
       </div>
 
-      <div className="relative">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate2" />
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search by name, email, phone, or ID number..."
-          className="w-full rounded-2xl border border-black/5 bg-white pl-9 pr-3 py-2.5 text-sm shadow-[0_10px_24px_rgba(15,23,42,0.03)] outline-none transition focus:border-accent/40 focus:ring-4 focus:ring-accent/10"
-        />
+      <div className="grid gap-3 rounded-2xl border border-black/5 bg-white p-3 shadow-[0_10px_24px_rgba(15,23,42,0.03)] md:grid-cols-[1fr_auto_auto]">
+        <div className="relative">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate2" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search name, email, phone, or ID..."
+            className="w-full rounded-xl border border-black/10 bg-slate-50 pl-9 pr-3 py-2.5 text-sm outline-none transition focus:border-accent/40 focus:ring-4 focus:ring-accent/10"
+          />
+        </div>
+        <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="rounded-xl border border-black/10 bg-slate-50 px-3 py-2.5 text-sm capitalize outline-none focus:border-accent/40 focus:ring-4 focus:ring-accent/10">
+          <option value="all">All roles</option>
+          <option value="rider">Riders</option>
+          <option value="driver">Drivers</option>
+        </select>
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="rounded-xl border border-black/10 bg-slate-50 px-3 py-2.5 text-sm capitalize outline-none focus:border-accent/40 focus:ring-4 focus:ring-accent/10">
+          <option value="all">All statuses</option>
+          <option value="active">Active</option>
+          <option value="suspended">Suspended</option>
+          <option value="archived">Archived</option>
+        </select>
       </div>
 
       {deletionRequests.length > 0 && (

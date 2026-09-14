@@ -1,13 +1,14 @@
 import React from 'react'
-import { ArchiveRestore, FileWarning, Users, Car } from 'lucide-react'
+import { ArchiveRestore, FileWarning, Users, Car, Shield } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
 import { Card, SectionHeader, EmptyState, Button } from '../components/ui.jsx'
 
 export default function Archived() {
-  const { users, drivers, restoreUser, restoreDriver } = useData()
+  const { users, drivers, admins, restoreUser, restoreDriver, restoreAdmin } = useData()
 
   const archivedUsers = users.filter((u) => u.status === 'archived')
   const archivedDrivers = drivers.filter((d) => d.status === 'archived')
+  const archivedAdmins = admins.filter((a) => a.status === 'archived')
 
   return (
     <div className="space-y-6">
@@ -16,12 +17,13 @@ export default function Archived() {
         subtitle="Review suspended or archived accounts before restoring or permanently removing them."
       />
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-3">
         <StatCard title="Archived users" value={archivedUsers.length} tone="info" icon={Users} />
         <StatCard title="Archived drivers" value={archivedDrivers.length} tone="warn" icon={Car} />
+        <StatCard title="Archived admins" value={archivedAdmins.length} tone="accent" icon={Shield} />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-3">
         <div>
           <h2 className="mb-3 font-display text-xl font-semibold text-ink">Users</h2>
           {archivedUsers.length === 0 ? (
@@ -60,6 +62,30 @@ export default function Archived() {
                       <div className="mt-1 text-xs text-slate2">{d.email || d.phone || 'Driver profile'}</div>
                     </div>
                     <Button variant="accent" className="!px-2 !py-1 text-xs" onClick={() => restoreDriver(d.id)}>
+                      <ArchiveRestore size={12} />
+                      Restore
+                    </Button>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div>
+          <h2 className="mb-3 font-display text-xl font-semibold text-ink">Admins</h2>
+          {archivedAdmins.length === 0 ? (
+            <EmptyState title="No archived admins" hint="Archived admin accounts will appear here for review." />
+          ) : (
+            <div className="space-y-3">
+              {archivedAdmins.map((a) => (
+                <Card key={a.id} className="p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-medium text-ink">{a.name}</div>
+                      <div className="mt-1 truncate text-xs text-slate2">{a.email} · {a.role.replace('_', ' ')}</div>
+                    </div>
+                    <Button variant="accent" className="!px-2 !py-1 text-xs" onClick={() => restoreAdmin(a.id)}>
                       <ArchiveRestore size={12} />
                       Restore
                     </Button>
