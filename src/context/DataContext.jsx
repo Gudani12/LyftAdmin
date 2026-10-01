@@ -207,6 +207,14 @@ export function DataProvider({ children }) {
   }, [])
 
   useEffect(() => {
+    if (!user?.id) {
+      setSafety((current) => ({ ...current, sos: [] }))
+      setSosError(null)
+      setSosLoading(false)
+      setSosRealtimeStatus('disconnected')
+      return
+    }
+
     loadSOSAlerts()
     const channel = safetySupabase
       .channel('admin-sos-alerts')
@@ -215,7 +223,7 @@ export function DataProvider({ children }) {
         setSosRealtimeStatus(status === 'SUBSCRIBED' ? 'connected' : status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED' ? 'disconnected' : 'connecting')
       })
     return () => { supabase.removeChannel(channel) }
-  }, [loadSOSAlerts])
+  }, [loadSOSAlerts, user?.id])
 
   useEffect(() => {
     localStorage.setItem('lyft_banned_identifiers', JSON.stringify(bannedIdentifiers))
