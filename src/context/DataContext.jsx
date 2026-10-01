@@ -1,10 +1,10 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react'
-import { useUser } from '@clerk/clerk-react'
+import { useAuth, useUser } from '@clerk/clerk-react'
 import {
   initialVerifications, initialUsers, initialTrips,
   initialSafety, initialPayouts, initialFailedPayments, initialAdmins,
 } from '../data/mockData.js'
-import { supabase } from '../lib/supabaseClient.js'
+import { safetySupabase, setSafetyAccessTokenProvider, supabase } from '../lib/supabaseClient.js'
 
 const DataContext = createContext(null)
 export const useData = () => useContext(DataContext)
@@ -88,11 +88,15 @@ const normalizeDriver = (driver) => {
 
 export function DataProvider({ children }) {
   const { user } = useUser()
+  const { getToken } = useAuth()
   const [verifications, setVerifications] = useState(initialVerifications)
   const [drivers, setDrivers] = useState([])
   const [users, setUsers] = useState(initialUsers)
   const [trips, setTrips] = useState(initialTrips)
-  const [safety, setSafety] = useState(initialSafety)
+  const [safety, setSafety] = useState({ ...initialSafety, sos: [] })
+  const [sosLoading, setSosLoading] = useState(true)
+  const [sosError, setSosError] = useState(null)
+  const [sosRealtimeStatus, setSosRealtimeStatus] = useState('connecting')
   const [payouts, setPayouts] = useState(initialPayouts)
   const [failedPayments, setFailedPayments] = useState(initialFailedPayments)
   const [admins, setAdmins] = useState(initialAdmins)
@@ -144,6 +148,11 @@ export function DataProvider({ children }) {
   const [hubsLoading, setHubsLoading] = useState(false)
   const [hubsError, setHubsError] = useState(null)
 
+  useEffect(() => {
+    setSafetyAccessTokenProvider(() => getToken())
+    return () => setSafetyAccessTokenProvider(null)
+  }, [getToken])
+
   const loadDrivers = useCallback(async () => {
     setDriversLoading(true)
     setDriversError(null)
@@ -161,6 +170,52 @@ export function DataProvider({ children }) {
   useEffect(() => {
     loadDrivers()
   }, [loadDrivers])
+
+  const loadSOSAlerts = useCallback(async () => {
+    setSosLoading(true)
+    setSosError(null)
+    const { data, error } = await safetySupabase.from('safety_alerts').select('*')
+    if (error) {
+      console.error('Failed to load SOS alerts from Supabase', error)
+      setSosError(error)
+    } else {
+      const alerts = (data || []).map((alert) => ({
+        ...alert,
+        id: alert.id,
+        userId: alert.user_id || alert.passenger_id || alert.driver_id,
+        user: alert.user_name || alert.passenger_name || alert.driver_name || alert.user || alert.passenger_id || alert.driver_id || 'Unknown user',
+        role: alert.user_role || alert.role || (alert.driver_id ? 'driver' : 'rider'),
+        tripId: alert.trip_id || alert.tripId || '—',
+        triggeredAt: alert.triggered_at || alert.created_at || alert.inserted_at,
+        location: alert.location || alert.address || (Number.isFinite(Number(alert.latitude)) && Number.isFinite(Number(alert.longitude)) ? `${alert.latitude}, ${alert.longitude}` : 'Location unavailable'),
+        latitude: alert.latitude,
+        longitude: alert.longitude,
+        status: alert.status || 'open',
+        resolvedNote: alert.resolved_note || alert.resolution_note || null,
+        escalationNote: alert.escalation_note || null,
+        acknowledgedAt: alert.acknowledged_at || null,
+        acknowledgedBy: alert.acknowledged_by || null,
+        escalatedAt: alert.escalated_at || null,
+        escalatedBy: alert.escalated_by || null,
+        resolvedAt: alert.resolved_at || null,
+        resolvedBy: alert.resolved_by || null,
+      }))
+      alerts.sort((a, b) => new Date(b.triggeredAt || 0).getTime() - new Date(a.triggeredAt || 0).getTime())
+      setSafety((current) => ({ ...current, sos: alerts }))
+    }
+    setSosLoading(false)
+  }, [])
+
+  useEffect(() => {
+    loadSOSAlerts()
+    const channel = safetySupabase
+      .channel('admin-sos-alerts')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'safety_alerts' }, loadSOSAlerts)
+      .subscribe((status) => {
+        setSosRealtimeStatus(status === 'SUBSCRIBED' ? 'connected' : status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED' ? 'disconnected' : 'connecting')
+      })
+    return () => { supabase.removeChannel(channel) }
+  }, [loadSOSAlerts])
 
   useEffect(() => {
     localStorage.setItem('lyft_banned_identifiers', JSON.stringify(bannedIdentifiers))
@@ -448,15 +503,33 @@ export function DataProvider({ children }) {
     })
   }, [logAudit])
 
-  const acknowledgeSOS = useCallback((id) => {
-    setSafety((s) => ({ ...s, sos: s.sos.map((x) => x.id === id ? { ...x, status: 'acknowledged' } : x) }))
-    logAudit('Acknowledged SOS alert', id)
-  }, [logAudit])
+  const updateSOSStatus = useCallback(async (id, status, note = '') => {
+    const now = new Date().toISOString()
+    const update = { status }
+    if (status === 'acknowledged') Object.assign(update, { acknowledged_at: now, acknowledged_by: currentAdmin.name })
+    if (status === 'escalated') Object.assign(update, { escalated_at: now, escalated_by: currentAdmin.name, escalation_note: note || null })
+    if (status === 'resolved') Object.assign(update, { resolved_at: now, resolved_by: currentAdmin.name, resolved_note: note })
+    const { error } = await safetySupabase.from('safety_alerts').update(update).eq('id', id)
+    if (error) {
+      console.error(`Failed to set SOS alert status to ${status}`, error)
+      setSosError(error)
+      return { error }
+    }
+    setSosError(null)
+    setSafety((current) => ({ ...current, sos: current.sos.map((alert) => alert.id === id ? {
+      ...alert,
+      status,
+      ...(status === 'acknowledged' ? { acknowledgedAt: now, acknowledgedBy: currentAdmin.name } : {}),
+      ...(status === 'escalated' ? { escalatedAt: now, escalatedBy: currentAdmin.name, escalationNote: note } : {}),
+      ...(status === 'resolved' ? { resolvedAt: now, resolvedBy: currentAdmin.name, resolvedNote: note } : {}),
+    } : alert) }))
+    logAudit(`${status === 'acknowledged' ? 'Acknowledged' : status === 'escalated' ? 'Escalated' : 'Resolved'} SOS alert`, `${id}${note ? ` — ${note}` : ''}`)
+    return {}
+  }, [currentAdmin.name, logAudit])
 
-  const resolveSOS = useCallback((id, note) => {
-    setSafety((s) => ({ ...s, sos: s.sos.map((x) => x.id === id ? { ...x, status: 'resolved', resolvedNote: note } : x) }))
-    logAudit('Resolved SOS alert', `${id} — ${note}`)
-  }, [logAudit])
+  const acknowledgeSOS = useCallback((id) => updateSOSStatus(id, 'acknowledged'), [updateSOSStatus])
+  const escalateSOS = useCallback((id, note) => updateSOSStatus(id, 'escalated', note), [updateSOSStatus])
+  const resolveSOS = useCallback((id, note) => updateSOSStatus(id, 'resolved', note), [updateSOSStatus])
 
   const forceEndTrip = useCallback((tripId) => {
     setTrips((list) => list.map((t) => t.id === tripId ? { ...t, status: 'completed', endedAt: new Date().toISOString(), forceEnded: true } : t))
@@ -525,7 +598,8 @@ export function DataProvider({ children }) {
     communicationTemplates, saveCommunicationTemplate, broadcastToSegment, sendExpiryDigest,
     outageBanner, publishOutageBanner, clearOutageBanner,
     incidentLog, recordIncident, tripChats,
-    acknowledgeSOS, resolveSOS, forceEndTrip, refundTrip, retryFailedPayment, sendPushToUser, logAudit,
+    acknowledgeSOS, escalateSOS, resolveSOS, sosLoading, sosError, sosRealtimeStatus, loadSOSAlerts,
+    forceEndTrip, refundTrip, retryFailedPayment, sendPushToUser, logAudit,
     driversLoading, driversError,
     hubs, hubsLoading, hubsError, loadHubs, createHub, updateHub, deleteHub,
   }

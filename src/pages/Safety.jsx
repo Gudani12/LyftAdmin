@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react'
-import { Siren, Volume2, VolumeX, Star as StarIcon, Flag, AlertTriangle, MessageSquare, ClipboardCheck, Phone } from 'lucide-react'
+import { Siren, Volume2, VolumeX, Star as StarIcon, Flag, AlertTriangle, MessageSquare, ClipboardCheck, Phone, PhoneCall, MapPin, RefreshCw, Radio } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
 import { Rail, StatusBadge, Button, Modal, SectionHeader, EmptyState, timeAgo, Card, fmtDate } from '../components/ui.jsx'
 
@@ -18,10 +18,12 @@ function beep() {
 }
 
 export default function Safety() {
-  const { safety, users, trips, acknowledgeSOS, resolveSOS, tripChats, incidentLog, recordIncident } = useData()
+  const { safety, users, trips, acknowledgeSOS, escalateSOS, resolveSOS, sosLoading, sosError, sosRealtimeStatus, loadSOSAlerts, tripChats, incidentLog, recordIncident } = useData()
   const [muted, setMuted] = useState(false)
   const [resolving, setResolving] = useState(null)
   const [note, setNote] = useState('')
+  const [escalating, setEscalating] = useState(null)
+  const [escalationNote, setEscalationNote] = useState('')
   const [chatTrip, setChatTrip] = useState(null)
   const [incidentTrip, setIncidentTrip] = useState(null)
   const [incidentOutcome, setIncidentOutcome] = useState('Resolved - no further action')
@@ -32,6 +34,7 @@ export default function Safety() {
   const openSOS = safety.sos.filter((s) => s.status === 'open')
   const ackSOS = safety.sos.filter((s) => s.status === 'acknowledged')
   const resolvedSOS = safety.sos.filter((s) => s.status === 'resolved')
+  const escalatedSOS = safety.sos.filter((s) => s.status === 'escalated')
 
   const summary = useMemo(() => ({
     open: openSOS.length,
@@ -51,15 +54,23 @@ export default function Safety() {
         title="Safety"
         subtitle="SOS alerts, low-rating flags, and reported users."
         action={
-          <Button variant="ghost" onClick={() => setMuted((m) => !m)}>
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={loadSOSAlerts} disabled={sosLoading} aria-label="Refresh SOS alerts">
+              <RefreshCw size={15} className={sosLoading ? 'animate-spin' : ''} /> Refresh
+            </Button>
+            <Button variant="ghost" onClick={() => setMuted((m) => !m)}>
             {muted ? <VolumeX size={15} /> : <Volume2 size={15} />} {muted ? 'Alerts muted' : 'Alerts on'}
-          </Button>
+            </Button>
+          </div>
         }
       />
 
-      <div className="grid gap-4 md:grid-cols-4">
+      {sosError && <div role="alert" className="rounded-xl border border-bad/20 bg-bad-bg px-4 py-3 text-sm text-bad">SOS alerts could not be loaded or updated: {sosError.message}</div>}
+
+      <div className="grid gap-4 md:grid-cols-5">
         <SummaryKPI label="Open SOS" value={summary.open} tone="urgent" icon={Siren} />
         <SummaryKPI label="Acknowledged" value={summary.acknowledged} tone="warn" icon={AlertTriangle} />
+        <SummaryKPI label="Escalated" value={escalatedSOS.length} tone="urgent" icon={Radio} />
         <SummaryKPI label="Low-rating flags" value={summary.lowRatings} tone="amber" icon={StarIcon} />
         <SummaryKPI label="Reported users" value={summary.reports} tone="bad" icon={Flag} />
       </div>
@@ -67,24 +78,33 @@ export default function Safety() {
       <div className="mb-3 flex items-center gap-2">
         <Siren size={16} className="text-bad" />
         <h2 className="font-display font-semibold">SOS inbox</h2>
+        {sosLoading && <span className="text-xs text-slate2">Syncing live alerts…</span>}
+        <span className={`text-xs ${sosRealtimeStatus === 'connected' ? 'text-good' : sosRealtimeStatus === 'disconnected' ? 'text-bad' : 'text-slate2'}`}>
+          {sosRealtimeStatus === 'connected' ? 'Live updates connected' : sosRealtimeStatus === 'disconnected' ? 'Live updates disconnected' : 'Connecting live updates…'}
+        </span>
         {openSOS.length > 0 && <span className="rounded-full bg-bad text-white text-xs px-2 py-0.5 sos-pulse">{openSOS.length} open</span>}
       </div>
 
-      {safety.sos.length === 0 ? (
-        <EmptyState title="No SOS alerts" />
+      {!sosLoading && safety.sos.length === 0 ? (
+        <EmptyState title={sosError ? 'SOS inbox unavailable' : 'No SOS alerts visible to this admin'} hint={sosError ? 'Check the safety_alerts table and its Supabase read policy.' : 'If safety_alerts contains rows in Supabase, confirm this app uses the same project and that its RLS policy grants this admin read access.'} />
       ) : (
         <div className="space-y-3 mb-6">
-          {[...openSOS, ...ackSOS, ...resolvedSOS].map((s) => (
-            <Rail key={s.id} tone={s.status === 'open' ? 'urgent' : s.status === 'acknowledged' ? 'warn' : 'ok'}>
-              <div className="flex items-center gap-4 px-4 py-3">
+          {[...openSOS, ...ackSOS, ...escalatedSOS, ...resolvedSOS].map((s) => (
+            <Rail key={s.id} tone={s.status === 'open' || s.status === 'escalated' ? 'urgent' : s.status === 'acknowledged' ? 'warn' : 'ok'}>
+              <div className="flex flex-wrap items-center gap-4 px-4 py-3">
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-medium">{s.user} <span className="text-slate2 capitalize font-normal">({s.role})</span></div>
                   <div className="text-xs text-slate2 mt-0.5">{s.location} &middot; trip {s.tripId} &middot; triggered {timeAgo(s.triggeredAt)}</div>
+                  {s.latitude != null && s.longitude != null && <a className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-accent" href={`https://www.google.com/maps?q=${encodeURIComponent(`${s.latitude},${s.longitude}`)}`} target="_blank" rel="noreferrer"><MapPin size={12} /> Open live location</a>}
                   {s.resolvedNote && <div className="text-xs text-good mt-0.5">Resolved: {s.resolvedNote}</div>}
                 </div>
                 <StatusBadge status={s.status} />
                 {s.status === 'open' && <Button variant="bad" onClick={() => acknowledgeSOS(s.id)}>Acknowledge</Button>}
-                {s.status === 'acknowledged' && <Button variant="good" onClick={() => setResolving(s)}>Resolve</Button>}
+                {(s.status === 'open' || s.status === 'acknowledged' || s.status === 'escalated') && <a href="tel:10111" className="inline-flex items-center gap-1.5 rounded-xl border border-bad/20 px-3 py-2 text-sm font-medium text-bad hover:bg-bad-bg"><PhoneCall size={14} /> Police 10111</a>}
+                {(s.status === 'open' || s.status === 'acknowledged' || s.status === 'escalated') && <a href="tel:112" className="inline-flex items-center gap-1.5 rounded-xl border border-bad/20 px-3 py-2 text-sm font-medium text-bad hover:bg-bad-bg"><PhoneCall size={14} /> Emergency 112</a>}
+                {s.status === 'acknowledged' && <Button variant="bad" onClick={() => setEscalating(s)}><Radio size={14} /> Escalate</Button>}
+                {(s.status === 'acknowledged' || s.status === 'escalated') && <Button variant="good" onClick={() => setResolving(s)}>Resolve</Button>}
+                {s.escalationNote && <div className="w-full text-xs text-bad">Escalation: {s.escalationNote}</div>}
               </div>
             </Rail>
           ))}
@@ -151,6 +171,16 @@ export default function Safety() {
         <div className="mt-4 flex justify-end gap-2 border-t border-black/5 pt-4">
           <Button variant="ghost" onClick={() => setResolving(null)}>Cancel</Button>
           <Button variant="good" onClick={() => { resolveSOS(resolving.id, note || 'Resolved by admin.'); setNote(''); setResolving(null) }}>Mark resolved</Button>
+        </div>
+      </Modal>
+
+      <Modal open={!!escalating} onClose={() => setEscalating(null)} title="Escalate SOS alert">
+        <div className="rounded-xl border border-bad/20 bg-bad-bg p-3 text-sm text-bad">Contact emergency services directly when there is immediate danger. Police: <a className="font-semibold underline" href="tel:10111">10111</a>; mobile emergency: <a className="font-semibold underline" href="tel:112">112</a>.</div>
+        <label className="mt-4 block text-xs text-slate2">Emergency response notes</label>
+        <textarea value={escalationNote} onChange={(event) => setEscalationNote(event.target.value)} rows={3} className="mt-1 w-full rounded-2xl border border-black/10 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/40" placeholder="Agency contacted, time, reference number, and response..." />
+        <div className="mt-4 flex justify-end gap-2 border-t border-black/5 pt-4">
+          <Button variant="ghost" onClick={() => setEscalating(null)}>Cancel</Button>
+          <Button variant="bad" onClick={async () => { const result = await escalateSOS(escalating.id, escalationNote || 'Emergency services contacted.'); if (!result?.error) { setEscalationNote(''); setEscalating(null) } }}><Radio size={14} /> Record escalation</Button>
         </div>
       </Modal>
 

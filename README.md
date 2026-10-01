@@ -102,6 +102,10 @@ The Supabase `admin` table links a Clerk account to an application role using `c
 
 The application currently loads the signed-in admin profile from Supabase and uses the stored role for admin actions. Keep RLS enabled and use a server-side Edge Function or backend API for privileged writes in production. Do not expose Supabase service-role keys in the frontend.
 
+### SOS safety workflow
+
+The admin Safety page reads `safety_alerts` and subscribes to its Postgres changes. Apply `supabase/migrations/20261001_admin_sos_response.sql` to add response audit fields, register the table for Realtime, and allow admins with a matching Clerk ID and `super_admin` or `support` role to read alerts and update response fields. Enable Clerk's native Supabase integration and add the Clerk domain under Supabase Authentication > Third-Party Auth. The admin app passes the normal Clerk session token to its safety-specific Supabase client; a custom JWT template is not required. Never expose a Supabase service-role key in the browser. The table needs an `id` primary key and `status` field, plus the passenger app's alert data such as user/trip identifiers, coordinates, and a creation timestamp.
+
 ## Data and security notes
 
 Some workflows currently use local state or browser storage while backend persistence is being completed, including identifier bans and several simulated audit or notification actions. These should be moved to protected Supabase tables or server-side functions before production launch.

@@ -10,4 +10,13 @@ if (!supabaseUrl || !supabaseKey) {
   )
 }
 
+let safetyAccessTokenProvider = async () => null
+
+export const setSafetyAccessTokenProvider = (provider) => {
+  safetyAccessTokenProvider = provider || (async () => null)
+}
+
 export const supabase = createClient(supabaseUrl, supabaseKey)
+export const safetySupabase = createClient(supabaseUrl, supabaseKey, {
+  accessToken: async () => safetyAccessTokenProvider(),
+})

@@ -19,6 +19,7 @@ const STATUS_STYLES = {
   failed: 'bg-bad-bg text-bad border-bad/30',
   open: 'bg-bad-bg text-bad border-bad/30',
   acknowledged: 'bg-amber-bg text-amber-700 border-amber/30',
+  escalated: 'bg-bad-bg text-bad border-bad/30',
   resolved: 'bg-good-bg text-good border-good/30',
   investigating: 'bg-amber-bg text-amber-700 border-amber/30',
   deleted: 'bg-slate2-bg text-slate2 border-slate2/30',
