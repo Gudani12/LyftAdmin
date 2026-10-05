@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>LyftAdmin</title>
+    <title>HopOn</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
     <script src="https://cdn.tailwindcss.com"></script>
@@ -12,17 +12,19 @@
         theme: {
           extend: {
             colors: {
-              deep: { DEFAULT: '#06231A', 800: '#04140D', 700: '#0A2C1D', 600: '#0D3E2F' },
-              ink: '#101814',
-              paper: '#F5F8F6',
-              accent: { DEFAULT: '#0E5C3F', 50: '#E6F2EC', 100: '#D7E8DB', 600: '#0C5338', 700: '#0A4A32' },
-              good: { DEFAULT: '#12724F', bg: '#E6F2EC' },
-              info: { DEFAULT: '#1FB574', bg: '#DFF7E6' },
-              mint: '#6FEFB4',
-              tint: '#E6F2EC',
+              brand: { deep: '#1d1135', dark: '#5A189A', accent: '#9D4EDD' },
+              ui: { surface: '#FFFFFF', ink: '#21152F', muted: '#746A7E', faint: '#A69BAF', border: '#E9E2F0' },
+              deep: { DEFAULT: '#1d1135', 800: '#1d1135', 700: '#2C1749', 600: '#3A2162' },
+              ink: '#21152F',
+              paper: '#F7F3FA',
+              accent: { DEFAULT: '#9D4EDD', 50: '#F3E9FF', 100: '#E9D7FF', 600: '#5A189A', 700: '#3F1B69' },
+              good: { DEFAULT: '#9D4EDD', bg: '#F3E9FF' },
+              info: { DEFAULT: '#5A189A', bg: '#F3E9FF' },
+              mint: '#D9B9FF',
+              tint: '#F3E9FF',
               bad: { DEFAULT: '#E04545', bg: '#FDE9E9' },
-              slate2: { DEFAULT: '#68756F', bg: '#E6F2EC' },
-              amber: { DEFAULT: '#E3A008', bg: '#FDF3DA' }
+              slate2: { DEFAULT: '#746A7E', bg: '#F3E9FF' },
+              amber: { DEFAULT: '#BA8CFF', bg: '#F3E9FF' }
             },
             fontFamily: {
               display: ['"Space Grotesk"', 'sans-serif'],

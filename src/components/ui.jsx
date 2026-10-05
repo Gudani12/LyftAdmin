@@ -1,32 +1,32 @@
 import React from 'react'
 
 const STATUS_STYLES = {
-  pending: 'bg-amber-bg text-amber-700 border-amber/30',
-  approved: 'bg-good-bg text-good border-good/30',
-  live: 'bg-good-bg text-good border-good/30',
+  pending: 'bg-brand-accent/10 text-brand-dark border-brand-accent/30',
+  approved: 'bg-brand-accent/10 text-brand-dark border-brand-accent/30',
+  live: 'bg-brand-accent/10 text-brand-dark border-brand-accent/30',
   rejected: 'bg-bad-bg text-bad border-bad/30',
   revoked: 'bg-bad-bg text-bad border-bad/30',
   suspended: 'bg-bad-bg text-bad border-bad/30',
   expired: 'bg-bad-bg text-bad border-bad/30',
-  resubmitted: 'bg-info-bg text-info border-info/30',
+  resubmitted: 'bg-brand-dark/10 text-brand-dark border-brand-dark/20',
   not_submitted: 'bg-slate2-bg text-slate2 border-slate2/30',
-  pending_review: 'bg-amber-bg text-amber-700 border-amber/30',
-  active: 'bg-good-bg text-good border-good/30',
-  in_progress: 'bg-info-bg text-info border-info/30',
-  completed: 'bg-good-bg text-good border-good/30',
+  pending_review: 'bg-brand-accent/10 text-brand-dark border-brand-accent/30',
+  active: 'bg-brand-accent/10 text-brand-dark border-brand-accent/30',
+  in_progress: 'bg-brand-dark/10 text-brand-dark border-brand-dark/20',
+  completed: 'bg-brand-accent/10 text-brand-dark border-brand-accent/30',
   cancelled: 'bg-slate2-bg text-slate2 border-slate2/30',
-  paid: 'bg-good-bg text-good border-good/30',
+  paid: 'bg-brand-accent/10 text-brand-dark border-brand-accent/30',
   failed: 'bg-bad-bg text-bad border-bad/30',
   open: 'bg-bad-bg text-bad border-bad/30',
-  acknowledged: 'bg-amber-bg text-amber-700 border-amber/30',
+  acknowledged: 'bg-brand-accent/10 text-brand-dark border-brand-accent/30',
   escalated: 'bg-bad-bg text-bad border-bad/30',
-  resolved: 'bg-good-bg text-good border-good/30',
-  investigating: 'bg-amber-bg text-amber-700 border-amber/30',
+  resolved: 'bg-brand-accent/10 text-brand-dark border-brand-accent/30',
+  investigating: 'bg-brand-accent/10 text-brand-dark border-brand-accent/30',
   deleted: 'bg-slate2-bg text-slate2 border-slate2/30',
   archived: 'bg-slate2-bg text-slate2 border-slate2/30',
-  clear: 'bg-good-bg text-good border-good/30',
+  clear: 'bg-brand-accent/10 text-brand-dark border-brand-accent/30',
   card_failed: 'bg-bad-bg text-bad border-bad/30',
-  ok: 'bg-good-bg text-good border-good/30',
+  ok: 'bg-brand-accent/10 text-brand-dark border-brand-accent/30',
 }
 
 export function StatusBadge({ status }) {
@@ -41,9 +41,9 @@ export function StatusBadge({ status }) {
 
 const RAIL_COLORS = {
   urgent: 'bg-bad',
-  warn: 'bg-amber',
-  info: 'bg-info',
-  ok: 'bg-good',
+  warn: 'bg-brand-accent',
+  info: 'bg-brand-dark',
+  ok: 'bg-brand-accent',
   neutral: 'bg-slate2',
 }
 
@@ -78,11 +78,11 @@ export function SectionHeader({ title, subtitle, action }) {
 
 export function Button({ children, variant = 'primary', className = '', ...props }) {
   const variants = {
-    primary: 'bg-ink text-white shadow-[0_8px_18px_rgba(16,24,20,0.18)] hover:bg-ink/90',
-    accent: 'bg-accent text-white shadow-[0_8px_18px_rgba(14,92,63,0.2)] hover:bg-accent-600',
-    good: 'bg-good text-white shadow-[0_8px_18px_rgba(18,114,79,0.22)] hover:opacity-95',
+    primary: 'bg-brand-deep text-white shadow-[0_8px_18px_rgba(29,17,53,0.22)] hover:bg-brand-dark',
+    accent: 'bg-brand-dark text-white shadow-[0_8px_18px_rgba(90,24,154,0.26)] hover:bg-brand-accent',
+    good: 'bg-brand-accent text-white shadow-[0_8px_18px_rgba(157,78,221,0.28)] hover:bg-brand-dark',
     bad: 'bg-bad text-white shadow-[0_8px_18px_rgba(224,69,69,0.22)] hover:opacity-95',
-    ghost: 'bg-transparent text-ink border border-black/10 hover:bg-black/5',
+    ghost: 'bg-transparent text-ui-ink border border-ui-border hover:bg-brand-accent/5',
   }
   return (
     <button

@@ -1,141 +1,59 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { SignIn, SignUp, SignedIn, SignedOut, useAuth, useUser } from '@clerk/clerk-react'
-import { supabase } from '../lib/supabaseClient.js'
+import { useData } from '../context/DataContext.jsx'
+import HopOnLogo from '../assets/hopon.logo.png'
 
 const AuthShell = ({ children }) => (
-  <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-    <div className="w-full max-w-md rounded-3xl border border-black/5 bg-white p-8 shadow-xl">
+  <div className="min-h-screen bg-brand-deep flex items-center justify-center p-4">
+    <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white p-8 shadow-[0_30px_80px_rgba(29,17,53,0.35)]">
       {children}
     </div>
   </div>
 )
-
-const persistLocalAdminProfile = (user) => {
-  const profile = {
-    clerk_id: user.id,
-    email: user.emailAddresses?.[0]?.emailAddress || user.primaryEmailAddress?.emailAddress || user.emailAddress || null,
-    full_name: user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim() || null,
-    role: 'super_admin',
-    created_at: new Date().toISOString(),
-    last_login_at: new Date().toISOString(),
-    sync_status: 'local_only',
-  }
-
-  try {
-    localStorage.setItem('lyft_admin_profile', JSON.stringify(profile))
-  } catch (storageError) {
-    console.warn('Unable to persist local admin profile', storageError)
-  }
-
-  return profile
-}
-
-const createAdminRecord = async (user) => {
-  if (!user) return { error: 'No clerk user available' }
-
-  const adminRecord = {
-    clerk_id: user.id,
-    email: user.emailAddresses?.[0]?.emailAddress || user.primaryEmailAddress?.emailAddress || user.emailAddress || null,
-    full_name: user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim() || null,
-    role: 'super_admin',
-    created_at: new Date().toISOString(),
-    last_login_at: new Date().toISOString(),
-  }
-
-  try {
-    const { data, error } = await supabase.from('admin').upsert(adminRecord, { onConflict: 'clerk_id' }).select().single()
-    if (error) {
-      const message = error.message || ''
-      const rlsBlocked = /row-level security|permission denied|violates row-level security|policy/i.test(message)
-      persistLocalAdminProfile(user)
-
-      if (rlsBlocked) {
-        console.warn('Supabase admin table is protected by RLS; continuing with local admin session profile.', error)
-        return { warning: 'Supabase admin table is locked by row-level security. Using a local admin profile for this session.' }
-      }
-
-      console.error('Failed to create admin record', error)
-      return { error }
-    }
-
-    console.log('Admin record upserted', data)
-    return { data }
-  } catch (error) {
-    persistLocalAdminProfile(user)
-    console.warn('Supabase sync unavailable; continuing with a local profile.', error)
-    return { warning: 'Supabase sync is unavailable. Using a local admin profile for this session.' }
-  }
-}
 
 export default function Auth() {
   const location = useLocation()
   const navigate = useNavigate()
   const { isSignedIn } = useAuth()
   const { user } = useUser()
-  const [saveError, setSaveError] = useState(null)
-  const [saveWarning, setSaveWarning] = useState(null)
-  const [saving, setSaving] = useState(false)
+  const { adminAccessStatus, adminAccessError } = useData()
 
   const route = location.pathname.includes('/register') ? 'register' : 'login'
 
   useEffect(() => {
-    const syncUser = async () => {
-      if (isSignedIn && user) {
-        setSaveError(null)
-        setSaveWarning(null)
-        setSaving(true)
-        const result = await createAdminRecord(user)
-        setSaving(false)
-
-        if (result?.error) {
-          setSaveError(result.error.message || JSON.stringify(result.error))
-          return
-        }
-
-        if (result?.warning) {
-          setSaveWarning(result.warning)
-        }
-
-        navigate('/dashboard', { replace: true })
-      }
+    if (isSignedIn && user && ['authorized', 'presentation'].includes(adminAccessStatus)) {
+      navigate('/dashboard', { replace: true })
     }
-    syncUser()
-  }, [isSignedIn, user, navigate])
+  }, [isSignedIn, user, adminAccessStatus, navigate])
 
   return (
     <AuthShell>
       <div className="mb-6 text-center">
-        <div className="text-sm uppercase tracking-[0.3em] text-slate2">Lyft Admin</div>
+        <div className="mb-2 flex items-center justify-center gap-2">
+          <img src={HopOnLogo} alt="HopOn" className="h-10 w-10 object-contain" />
+          <span className="text-sm font-semibold uppercase tracking-[0.3em] text-slate2">HopOn</span>
+        </div>
         <h1 className="mt-3 text-3xl font-semibold text-ink">{route === 'register' ? 'Create your admin account' : 'Admin login'}</h1>
-        <p className="mt-2 text-sm text-slate2">Sign in with Clerk, then your admin profile will be created in Supabase. Multi-factor challenges are handled by Clerk when enabled for this admin workspace.</p>
+        <p className="mt-2 text-sm text-slate2">Sign in with your pre-authorized admin account. Multi-factor challenges are handled by Clerk when enabled for this admin workspace.</p>
       </div>
 
       <SignedIn>
-        <div className="rounded-2xl border border-black/5 bg-emerald-50 p-4 text-sm text-emerald-900">
+        <div className="rounded-2xl border border-brand-accent/20 bg-brand-accent/10 p-4 text-sm text-ui-ink">
           <div className="font-medium">Signed in as {user?.fullName || user?.primaryEmailAddress?.emailAddress || user?.emailAddress || 'your account'}</div>
           {user?.primaryEmailAddress?.emailAddress && (
-            <div className="text-slate2 text-xs mt-1">{user.primaryEmailAddress.emailAddress}</div>
+            <div className="mt-1 text-xs text-ui-muted">{user.primaryEmailAddress.emailAddress}</div>
           )}
-          <div className="mt-2">{saving ? 'Saving admin record...' : 'Redirecting...'}</div>
-          {saveWarning && (
-            <div className="mt-3 rounded-xl border border-amber/20 bg-amber-bg px-3 py-2 text-sm text-amber-700">
-              {saveWarning}
-            </div>
-          )}
-          {saveError && (
-            <div className="mt-3 rounded-xl border border-bad/20 bg-bad-bg px-3 py-2 text-sm text-bad">
-              Error saving admin record: {saveError}
-            </div>
-          )}
+          {user?.id && <div className="mt-2 font-mono text-xs text-brand-dark">Clerk user ID: {user.id}</div>}
+          <div className="mt-2 text-ui-muted">{adminAccessStatus === 'loading' ? 'Checking administrator access…' : adminAccessStatus === 'authorized' ? 'Access granted. Redirecting…' : adminAccessStatus === 'presentation' ? 'Local presentation access. Database permissions are still enforced by Supabase.' : adminAccessStatus === 'error' ? `Could not verify your admin profile: ${adminAccessError?.message || 'Supabase request failed'}. Check admin-table read access and apply the admin settings migration.` : 'No active admin profile with a recognized role was found for this Clerk account. Ask a super administrator to verify the Clerk ID and role in Supabase.'}</div>
         </div>
       </SignedIn>
 
       <SignedOut>
         {route === 'register' ? (
-          <SignUp path="/register" routing="path" signInUrl="/login" />
+          <SignUp path="/register" routing="path" signInUrl="/login" appearance={{ elements: { headerTitle: 'hidden' } }} />
         ) : (
-          <SignIn path="/login" routing="path" signUpUrl="/register" />
+          <SignIn path="/login" routing="path" signUpUrl="/register" appearance={{ elements: { headerTitle: 'hidden' } }} />
         )}
       </SignedOut>
     </AuthShell>

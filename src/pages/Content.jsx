@@ -1,6 +1,7 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Check } from 'lucide-react'
 import { SectionHeader, Button } from '../components/ui.jsx'
+import { useData } from '../context/DataContext.jsx'
 
 const TABS = [
   { key: 'terms', label: 'Terms of service' },
@@ -19,11 +20,27 @@ const DEFAULTS = {
 }
 
 export default function Content() {
+  const { adminSettings, adminSettingsLoading, adminSettingsError, saveAdminSetting } = useData()
   const [tab, setTab] = useState('terms')
   const [content, setContent] = useState(DEFAULTS)
   const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
 
-  const save = () => {
+  useEffect(() => {
+    if (!adminSettingsLoading && adminSettings.content) setContent({ ...DEFAULTS, ...adminSettings.content })
+  }, [adminSettings.content, adminSettingsLoading])
+
+  const save = async () => {
+    setSaving(true)
+    setSaved(false)
+    setSaveError('')
+    const result = await saveAdminSetting('content', content)
+    setSaving(false)
+    if (result.error) {
+      setSaveError(result.error.message || 'Unable to save content.')
+      return
+    }
     setSaved(true)
     setTimeout(() => setSaved(false), 1800)
   }
@@ -33,8 +50,9 @@ export default function Content() {
       <SectionHeader
         title="Content"
         subtitle="Edit static in-app content."
-        action={<Button variant="accent" onClick={save}>{saved ? <><Check size={15} /> Saved</> : 'Save changes'}</Button>}
+        action={<Button variant="accent" onClick={save} disabled={saving || adminSettingsLoading}>{saving ? 'Saving…' : saved ? <><Check size={15} /> Saved</> : 'Save changes'}</Button>}
       />
+      {(adminSettingsError || saveError) && <div role="alert" className="rounded-xl border border-bad/20 bg-bad-bg px-4 py-3 text-sm text-bad">{saveError || `Content could not be loaded: ${adminSettingsError.message}`}</div>}
 
       <div className="flex gap-2 mb-5 flex-wrap">
         {TABS.map((t) => (
@@ -51,11 +69,12 @@ export default function Content() {
       <div className="rounded-2xl border border-black/5 bg-white p-5 shadow-[0_10px_24px_rgba(15,23,42,0.03)]">
         <textarea
           value={content[tab]}
+          disabled={adminSettingsLoading}
           onChange={(e) => setContent({ ...content, [tab]: e.target.value })}
           rows={14}
           className="w-full rounded-xl border border-black/10 bg-slate-50 p-4 text-sm font-mono leading-relaxed focus:outline-none focus:ring-2 focus:ring-accent/40"
         />
-        <p className="text-xs text-slate2 mt-3">This is a local draft. Publishing to the live app isn't wired up yet — hook this up to your content API when ready.</p>
+        <p className="text-xs text-slate2 mt-3">Saved content is shared with admin accounts. The passenger app must read these settings before changes appear there.</p>
       </div>
     </div>
   )

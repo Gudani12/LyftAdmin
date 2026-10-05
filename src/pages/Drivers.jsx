@@ -11,6 +11,7 @@ export default function Drivers() {
   const [active, setActive] = useState(null)
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [actionError, setActionError] = useState('')
 
   const summary = useMemo(() => {
     if (!drivers.length) return { live: 0, pending: 0, expired: 0, risk: 0 }
@@ -33,6 +34,7 @@ export default function Drivers() {
   return (
     <div className="space-y-6">
       <SectionHeader title="Drivers" subtitle="Document status, vehicles, and go-live approval." />
+      {actionError && <div role="alert" className="rounded-xl border border-bad/20 bg-bad-bg px-4 py-3 text-sm text-bad">{actionError}</div>}
 
       <div className="grid gap-4 md:grid-cols-4">
         <SummaryCard label="Live" value={summary.live} tone="good" icon={BadgeCheck} />
@@ -100,7 +102,7 @@ export default function Drivers() {
                 <div className="flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-accent-100 to-emerald-100 text-xs font-bold text-accent-700">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-brand-accent/15 to-brand-dark/10 text-xs font-bold text-brand-dark">
                         {d.name.split(' ').map((s) => s[0]).join('').slice(0, 2)}
                       </div>
                       <div className="min-w-0">
@@ -129,17 +131,21 @@ export default function Drivers() {
                   <div className="flex items-center gap-3 md:justify-end">
                     <StatusBadge status={d.status} />
                     <Button variant="ghost" onClick={() => setActive(d)}>Details</Button>
-                    <Button variant="accent" className="!px-2 !py-1 text-xs" onClick={() => {
+                    <Button variant="accent" className="!px-2 !py-1 text-xs" onClick={async () => {
                       const reason = window.prompt(`Archive ${d.name}? Add the reason for archiving this driver account.`, 'Policy violation / inactive account')
                       if (reason && reason.trim()) {
-                        archiveDriver(d.id, reason.trim())
+                        const result = await archiveDriver(d.id, reason.trim())
+                        setActionError(result?.error?.message || '')
                       }
                     }}>Archive</Button>
                     {currentAdmin?.role === 'super_admin' && (
-                      <Button variant="bad" className="!px-2 !py-1 text-xs" onClick={() => {
+                      <Button variant="bad" className="!px-2 !py-1 text-xs" onClick={async () => {
                         const reason = window.prompt(`Delete ${d.name} permanently? Add a reason before permanent deletion.`, 'Fraudulent driver profile')
                         if (reason && reason.trim()) {
-                          if (window.confirm(`This will permanently remove ${d.name}. Continue?`)) deleteDriver(d.id)
+                          if (window.confirm(`This will permanently remove ${d.name}. Continue?`)) {
+                            const result = await deleteDriver(d.id)
+                            setActionError(result?.error?.message || '')
+                          }
                         }
                       }}>Delete</Button>
                     )}
@@ -157,6 +163,21 @@ export default function Drivers() {
 }
 
 function DriverModal({ driver: d, onClose, onSetLive, onRestore }) {
+  const [saving, setSaving] = useState(false)
+  const [actionError, setActionError] = useState('')
+
+  const runAction = async (action) => {
+    setSaving(true)
+    setActionError('')
+    const result = await action()
+    setSaving(false)
+    if (result?.error) {
+      setActionError(result.error.message || 'The driver change could not be saved.')
+      return
+    }
+    onClose()
+  }
+
   if (!d) return null
   return (
     <Modal open={!!d} onClose={onClose} title={d.name} wide>
@@ -200,13 +221,14 @@ function DriverModal({ driver: d, onClose, onSetLive, onRestore }) {
 
       <div className="mt-5 flex justify-end gap-2 border-t border-black/5 pt-4">
         {d.status === 'archived' ? (
-          <Button variant="good" onClick={() => { onRestore(d.id); onClose() }}>Restore driver</Button>
+          <Button variant="good" disabled={saving} onClick={() => runAction(() => onRestore(d.id))}>{saving ? 'Saving…' : 'Restore driver'}</Button>
         ) : d.liveApproved ? (
-          <Button variant="bad" onClick={() => { onSetLive(d.id, false); onClose() }}>Revoke access</Button>
+          <Button variant="bad" disabled={saving} onClick={() => runAction(() => onSetLive(d.id, false))}>{saving ? 'Saving…' : 'Revoke access'}</Button>
         ) : (
-          <Button variant="good" onClick={() => { onSetLive(d.id, true); onClose() }}>Approve to go live</Button>
+          <Button variant="good" disabled={saving} onClick={() => runAction(() => onSetLive(d.id, true))}>{saving ? 'Saving…' : 'Approve to go live'}</Button>
         )}
       </div>
+      {actionError && <p role="alert" className="mt-3 text-sm text-bad">{actionError}</p>}
     </Modal>
   )
 }

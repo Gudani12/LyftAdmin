@@ -1,6 +1,7 @@
 import React from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from '@clerk/clerk-react'
+import { useData } from './context/DataContext.jsx'
 import Layout from './components/Layout.jsx'
 import Verification from './pages/Verification.jsx'
 import Drivers from './pages/Drivers.jsx'
@@ -20,8 +21,11 @@ import Auth from './pages/Auth.jsx'
 
 function RequireAuth({ children }) {
   const { isSignedIn } = useAuth()
+  const { adminAccessStatus } = useData()
   if (isSignedIn === undefined) return null
-  return isSignedIn ? children : <Navigate to="/login" replace />
+  if (!isSignedIn) return <Navigate to="/login" replace />
+  if (adminAccessStatus === 'loading') return <div className="p-8 text-sm text-slate2">Checking administrator access…</div>
+  return adminAccessStatus === 'authorized' || adminAccessStatus === 'presentation' ? children : <Navigate to="/login?access=denied" replace />
 }
 
 export default function App() {

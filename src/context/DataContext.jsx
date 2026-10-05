@@ -2,14 +2,23 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import { useAuth, useUser } from '@clerk/clerk-react'
 import {
   initialVerifications, initialUsers, initialTrips,
-  initialSafety, initialPayouts, initialFailedPayments, initialAdmins,
+  initialSafety, initialPayouts, initialFailedPayments, ROLES,
 } from '../data/mockData.js'
-import { safetySupabase, setSafetyAccessTokenProvider, supabase } from '../lib/supabaseClient.js'
+import { safetySupabase, setSupabaseAccessTokenProvider, supabase } from '../lib/supabaseClient.js'
 
 const DataContext = createContext(null)
 export const useData = () => useContext(DataContext)
 
 const CURRENT_ADMIN = { id: 'adm_5', name: 'You', role: 'super_admin' }
+const PRESENTATION_ADMIN = {
+  id: 'user_3HDsbBFCEFwD3A2yVg5ZAjDhKgY',
+  clerk_id: 'user_3HDsbBFCEFwD3A2yVg5ZAjDhKgY',
+  name: 'Gudani Makwarela',
+  email: 'gudanimakwarela12@gmail.com',
+  role: 'super_admin',
+  status: 'active',
+}
+
 
 const normalizeAdmin = (admin) => ({
   id: admin.id || admin.clerk_id,
@@ -99,8 +108,10 @@ export function DataProvider({ children }) {
   const [sosRealtimeStatus, setSosRealtimeStatus] = useState('connecting')
   const [payouts, setPayouts] = useState(initialPayouts)
   const [failedPayments, setFailedPayments] = useState(initialFailedPayments)
-  const [admins, setAdmins] = useState(initialAdmins)
+  const [admins, setAdmins] = useState([])
   const [currentAdmin, setCurrentAdmin] = useState(CURRENT_ADMIN)
+  const [adminAccessStatus, setAdminAccessStatus] = useState('loading')
+  const [adminAccessError, setAdminAccessError] = useState(null)
   const [bannedIdentifiers, setBannedIdentifiers] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('lyft_banned_identifiers') || '[]')
@@ -147,10 +158,13 @@ export function DataProvider({ children }) {
   const [hubs, setHubs] = useState([])
   const [hubsLoading, setHubsLoading] = useState(false)
   const [hubsError, setHubsError] = useState(null)
+  const [adminSettings, setAdminSettings] = useState({})
+  const [adminSettingsLoading, setAdminSettingsLoading] = useState(true)
+  const [adminSettingsError, setAdminSettingsError] = useState(null)
 
   useEffect(() => {
-    setSafetyAccessTokenProvider(() => getToken())
-    return () => setSafetyAccessTokenProvider(null)
+    setSupabaseAccessTokenProvider(() => getToken())
+    return () => setSupabaseAccessTokenProvider(null)
   }, [getToken])
 
   const loadDrivers = useCallback(async () => {
@@ -168,8 +182,8 @@ export function DataProvider({ children }) {
   }, [])
 
   useEffect(() => {
-    loadDrivers()
-  }, [loadDrivers])
+    if (user?.id) loadDrivers()
+  }, [loadDrivers, user?.id])
 
   const loadSOSAlerts = useCallback(async () => {
     setSosLoading(true)
@@ -243,30 +257,97 @@ export function DataProvider({ children }) {
   }, [incidentLog])
 
   useEffect(() => {
-    if (!user?.id) return
+    if (!user?.id) {
+      setCurrentAdmin(null)
+      setAdminAccessError(null)
+      setAdminAccessStatus('signed_out')
+      return
+    }
 
     const loadCurrentAdmin = async () => {
+      setAdminAccessStatus('loading')
+      setAdminAccessError(null)
       const { data, error } = await supabase.from('admin').select('*').eq('clerk_id', user.id).maybeSingle()
       if (error) {
         console.error('Failed to load current admin profile from Supabase', error)
+        setCurrentAdmin(null)
+        setAdminAccessError(error)
+        setAdminAccessStatus('error')
         return
       }
-      if (!data) return
+      if (!data || !ROLES.includes(data.role) || (data.status || 'active') !== 'active') {
+        if (import.meta.env.DEV && user.id === PRESENTATION_ADMIN.clerk_id) {
+          setCurrentAdmin(PRESENTATION_ADMIN)
+          setAdmins([PRESENTATION_ADMIN])
+          setAdminAccessStatus('presentation')
+          return
+        }
+        setCurrentAdmin(null)
+        setAdmins([])
+        setAdminAccessStatus('denied')
+        return
+      }
 
       const admin = normalizeAdmin(data)
       setCurrentAdmin(admin)
-      setAdmins((list) => [admin, ...list.filter((item) => item.id !== CURRENT_ADMIN.id && item.clerk_id !== admin.clerk_id && item.id !== admin.id)])
+      if (admin.role === 'super_admin') {
+        const { data: adminRows, error: adminsError } = await supabase.from('admin').select('*').order('created_at', { ascending: false })
+        if (adminsError) console.error('Failed to load admin accounts', adminsError)
+        setAdmins((adminRows || [data]).map(normalizeAdmin))
+      } else {
+        setAdmins([admin])
+      }
+      setAdminAccessStatus('authorized')
     }
 
     loadCurrentAdmin()
   }, [user?.id])
 
-  const logAudit = useCallback((action, target) => {
-    setAuditLog((log) => [
-      { id: `aud_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, admin: currentAdmin.name, role: currentAdmin.role, action, target, at: new Date().toISOString() },
-      ...log,
-    ])
-  }, [currentAdmin])
+  const loadAuditLog = useCallback(async () => {
+    if (adminAccessStatus !== 'authorized') return { error: new Error('Admin access is required to load the audit log.') }
+    const { data, error } = await supabase.from('admin_audit_log').select('*').order('created_at', { ascending: false }).limit(250)
+    if (error) {
+      console.error('Failed to load admin audit history', error)
+      return { error }
+    }
+    setAuditLog((data || []).map((entry) => ({
+      id: entry.id,
+      admin: entry.admin_name,
+      role: entry.admin_role,
+      action: entry.action,
+      target: entry.target,
+      at: entry.created_at,
+    })))
+    return { data }
+  }, [adminAccessStatus])
+
+  useEffect(() => {
+    if (adminAccessStatus === 'authorized') loadAuditLog()
+  }, [adminAccessStatus, loadAuditLog])
+
+  const logAudit = useCallback(async (action, target) => {
+    if (adminAccessStatus !== 'authorized' || !user?.id || !currentAdmin) return { error: new Error('Admin access is required to write audit history.') }
+    const { data, error } = await supabase.from('admin_audit_log').insert({
+      admin_clerk_id: user.id,
+      admin_name: currentAdmin.name,
+      admin_role: currentAdmin.role,
+      action,
+      target: String(target ?? ''),
+    }).select('*').single()
+    if (error) {
+      console.error('Failed to persist admin audit event', error)
+      return { error }
+    }
+    setAuditLog((log) => [{
+      id: data.id,
+      admin: data.admin_name,
+      role: data.admin_role,
+      action: data.action,
+      target: data.target,
+      at: data.created_at,
+    }, ...log].slice(0, 250))
+    return { data }
+  }, [adminAccessStatus, currentAdmin, user?.id])
 
   const loadHubs = useCallback(async () => {
     setHubsLoading(true)
@@ -282,8 +363,71 @@ export function DataProvider({ children }) {
   }, [])
 
   useEffect(() => {
-    loadHubs()
-  }, [loadHubs])
+    if (user?.id) loadHubs()
+  }, [loadHubs, user?.id])
+
+  const loadAdminSettings = useCallback(async () => {
+    if (!user?.id) return { error: new Error('Sign in to load admin settings.') }
+    setAdminSettingsLoading(true)
+    const { data, error } = await supabase.from('admin_app_settings').select('key, value')
+    if (error) {
+      console.error('Failed to load admin settings from Supabase', error)
+      setAdminSettingsError(error)
+      setAdminSettingsLoading(false)
+      return { error }
+    }
+    setAdminSettingsError(null)
+    const settings = Object.fromEntries((data || []).map((setting) => [setting.key, setting.value]))
+    setAdminSettings(settings)
+    if ('banned_identifiers' in settings) setBannedIdentifiers(settings.banned_identifiers || [])
+    if ('communication_templates' in settings) setCommunicationTemplates(settings.communication_templates || {})
+    if ('outage_banner' in settings) setOutageBanner(settings.outage_banner)
+    if ('incident_log' in settings) setIncidentLog(settings.incident_log || [])
+    setAdminSettingsLoading(false)
+    return { data }
+  }, [user?.id])
+
+  useEffect(() => {
+    if (adminAccessStatus === 'authorized') loadAdminSettings()
+  }, [adminAccessStatus, loadAdminSettings])
+
+  const saveAdminSetting = useCallback(async (key, value) => {
+    if (adminAccessStatus !== 'authorized' || !user?.id) return { error: new Error('Admin access is required to save settings.') }
+    const { data, error } = await supabase.from('admin_app_settings')
+      .upsert({ key, value, updated_by: user.id, updated_at: new Date().toISOString() }, { onConflict: 'key' })
+      .select('key, value')
+      .single()
+    if (error) {
+      console.error(`Failed to save admin setting ${key}`, error)
+      return { error }
+    }
+    setAdminSettings((current) => ({ ...current, [key]: data.value }))
+    return { data }
+  }, [adminAccessStatus, user?.id])
+
+  useEffect(() => {
+    if (adminAccessStatus === 'authorized' && !adminSettingsLoading && !adminSettingsError) {
+      saveAdminSetting('banned_identifiers', bannedIdentifiers)
+    }
+  }, [adminAccessStatus, adminSettingsLoading, adminSettingsError, bannedIdentifiers, saveAdminSetting])
+
+  useEffect(() => {
+    if (adminAccessStatus === 'authorized' && !adminSettingsLoading && !adminSettingsError) {
+      saveAdminSetting('communication_templates', communicationTemplates)
+    }
+  }, [adminAccessStatus, adminSettingsLoading, adminSettingsError, communicationTemplates, saveAdminSetting])
+
+  useEffect(() => {
+    if (adminAccessStatus === 'authorized' && !adminSettingsLoading && !adminSettingsError) {
+      saveAdminSetting('outage_banner', outageBanner)
+    }
+  }, [adminAccessStatus, adminSettingsLoading, adminSettingsError, outageBanner, saveAdminSetting])
+
+  useEffect(() => {
+    if (adminAccessStatus === 'authorized' && !adminSettingsLoading && !adminSettingsError) {
+      saveAdminSetting('incident_log', incidentLog)
+    }
+  }, [adminAccessStatus, adminSettingsLoading, adminSettingsError, incidentLog, saveAdminSetting])
 
   const createHub = useCallback(async (hub) => {
     const { data, error } = await supabase.from('hubs').insert(hub).select().single()
@@ -367,6 +511,7 @@ export function DataProvider({ children }) {
     const { error } = await supabase.from('drivers').update(updatePayload).eq('id', driverId)
     if (error) {
       console.error('Failed to update driver live status in Supabase', error)
+      return { error }
     }
 
     setDrivers((list) => list.map((d) => d.id === driverId ? {
@@ -381,6 +526,7 @@ export function DataProvider({ children }) {
     const d = drivers.find((x) => x.id === driverId)
     logAudit(live ? 'Approved driver to go live' : 'Revoked driver', d?.name || driverId)
     if (d) notify(d.name, live ? 'You are approved to drive' : 'Driving access revoked', live ? 'You can now go online and accept trips.' : 'Your ability to accept trips has been revoked. Contact support for details.')
+    return {}
   }, [drivers, logAudit, notify])
 
   const setUserStatus = useCallback((userId, status, reason) => {
@@ -409,7 +555,7 @@ export function DataProvider({ children }) {
     }
     setBannedIdentifiers((list) => list.some((item) => item.type === type && item.value === normalizedValue) ? list : [ban, ...list])
     logAudit(`Banned ${type}`, `${normalizedValue}${reason ? ' — ' + reason : ''}`)
-  }, [currentAdmin.name, logAudit])
+  }, [currentAdmin?.name, logAudit])
 
   const unbanIdentifier = useCallback((banId) => {
     const ban = bannedIdentifiers.find((item) => item.id === banId)
@@ -442,73 +588,79 @@ export function DataProvider({ children }) {
     })
   }, [logAudit])
 
-  const deleteAdmin = useCallback((adminId) => {
-    setAdmins((list) => {
-      const removed = list.find((a) => a.id === adminId)
-      if (removed) logAudit('Deleted admin account', `${removed.name} (${removed.role})`)
-      return list.filter((a) => a.id !== adminId)
-    })
-  }, [logAudit])
-
-  const archiveAdmin = useCallback((adminId, reason) => {
-    setAdmins((list) => list.map((a) => a.id === adminId ? {
-      ...a,
-      status: 'archived',
-      archiveReason: reason,
-      archivedAt: new Date().toISOString(),
-    } : a))
-    const admin = admins.find((a) => a.id === adminId)
-    logAudit('Archived admin account', `${admin?.name || adminId}${reason ? ' — ' + reason : ''}`)
+  const deleteAdmin = useCallback(async (adminId) => {
+    const admin = admins.find((item) => item.id === adminId)
+    if (!admin?.clerk_id) return { error: new Error('Admin account was not found.') }
+    const { error } = await supabase.from('admin').delete().eq('clerk_id', admin.clerk_id)
+    if (error) return { error }
+    setAdmins((list) => list.filter((item) => item.id !== adminId))
+    logAudit('Deleted admin account', `${admin.name} (${admin.role})`)
+    return {}
   }, [admins, logAudit])
 
-  const restoreAdmin = useCallback((adminId) => {
-    setAdmins((list) => list.map((a) => a.id === adminId ? {
-      ...a,
-      status: 'active',
-      archiveReason: null,
-      archivedAt: null,
-    } : a))
-    const admin = admins.find((a) => a.id === adminId)
-    logAudit('Restored admin account', admin?.name || adminId)
+  const archiveAdmin = useCallback(async (adminId, reason) => {
+    const admin = admins.find((item) => item.id === adminId)
+    if (!admin?.clerk_id) return { error: new Error('Admin account was not found.') }
+    const archivedAt = new Date().toISOString()
+    const { error } = await supabase.from('admin').update({ status: 'archived', archive_reason: reason, archived_at: archivedAt }).eq('clerk_id', admin.clerk_id)
+    if (error) return { error }
+    setAdmins((list) => list.map((item) => item.id === adminId ? { ...item, status: 'archived', archiveReason: reason, archivedAt } : item))
+    logAudit('Archived admin account', `${admin.name}${reason ? ` — ${reason}` : ''}`)
+    return {}
   }, [admins, logAudit])
 
-  const archiveDriver = useCallback((driverId, reason) => {
-    setDrivers((list) => list.map((d) => d.id === driverId ? {
-      ...d,
+  const restoreAdmin = useCallback(async (adminId) => {
+    const admin = admins.find((item) => item.id === adminId)
+    if (!admin?.clerk_id) return { error: new Error('Admin account was not found.') }
+    const { error } = await supabase.from('admin').update({ status: 'active', archive_reason: null, archived_at: null }).eq('clerk_id', admin.clerk_id)
+    if (error) return { error }
+    setAdmins((list) => list.map((item) => item.id === adminId ? { ...item, status: 'active', archiveReason: null, archivedAt: null } : item))
+    logAudit('Restored admin account', admin.name)
+    return {}
+  }, [admins, logAudit])
+
+  const archiveDriver = useCallback(async (driverId, reason) => {
+    const { error } = await supabase.from('drivers').update({ status: 'archived', is_online: false }).eq('id', driverId)
+    if (error) return { error }
+    setDrivers((list) => list.map((driver) => driver.id === driverId ? {
+      ...driver,
       status: 'archived',
       liveApproved: false,
       is_online: false,
-      backgroundCheck: 'pending',
-      notes: reason ? [...(d.notes || []), `Archived: ${reason} (${new Date().toLocaleString()})`] : (d.notes || []),
-    } : d))
-    const d = drivers.find((x) => x.id === driverId)
-    logAudit('Archived driver account', `${d?.name || driverId}${reason ? ' — ' + reason : ''}`)
+      notes: reason ? [...(driver.notes || []), `Archived: ${reason} (${new Date().toLocaleString()})`] : (driver.notes || []),
+    } : driver))
+    const driver = drivers.find((item) => item.id === driverId)
+    logAudit('Archived driver account', `${driver?.name || driverId}${reason ? ` — ${reason}` : ''}`)
+    return {}
   }, [drivers, logAudit])
 
-  const restoreDriver = useCallback((driverId) => {
-    setDrivers((list) => list.map((d) => d.id === driverId ? {
-      ...d,
+  const restoreDriver = useCallback(async (driverId) => {
+    const { error } = await supabase.from('drivers').update({ status: 'pending_review', is_online: false }).eq('id', driverId)
+    if (error) return { error }
+    setDrivers((list) => list.map((driver) => driver.id === driverId ? {
+      ...driver,
       status: 'pending_review',
       liveApproved: false,
       is_online: false,
-      backgroundCheck: 'pending',
-      notes: [...(d.notes || []), `Restored: pending review reinstated (${new Date().toLocaleString()})`],
-    } : d))
-    const d = drivers.find((x) => x.id === driverId)
-    logAudit('Restored driver account', d?.name || driverId)
+      notes: [...(driver.notes || []), `Restored: pending review reinstated (${new Date().toLocaleString()})`],
+    } : driver))
+    const driver = drivers.find((item) => item.id === driverId)
+    logAudit('Restored driver account', driver?.name || driverId)
+    return {}
   }, [drivers, logAudit])
 
   const deleteDriver = useCallback(async (driverId) => {
     const { error } = await supabase.from('drivers').delete().eq('id', driverId)
     if (error) {
       console.error('Failed to delete driver from Supabase', error)
-      return
+      return { error }
     }
     setDrivers((list) => {
       const removed = list.find((d) => d.id === driverId)
       if (removed) logAudit('Deleted driver', removed.name)
       return list.filter((d) => d.id !== driverId)
     })
+    return {}
   }, [logAudit])
 
   const updateSOSStatus = useCallback(async (id, status, note = '') => {
@@ -533,7 +685,7 @@ export function DataProvider({ children }) {
     } : alert) }))
     logAudit(`${status === 'acknowledged' ? 'Acknowledged' : status === 'escalated' ? 'Escalated' : 'Resolved'} SOS alert`, `${id}${note ? ` — ${note}` : ''}`)
     return {}
-  }, [currentAdmin.name, logAudit])
+  }, [currentAdmin?.name, logAudit])
 
   const acknowledgeSOS = useCallback((id) => updateSOSStatus(id, 'acknowledged'), [updateSOSStatus])
   const escalateSOS = useCallback((id, note) => updateSOSStatus(id, 'escalated', note), [updateSOSStatus])
@@ -595,10 +747,11 @@ export function DataProvider({ children }) {
     const entry = { ...incident, id: `inc_${Date.now()}`, recordedAt: new Date().toISOString(), recordedBy: currentAdmin.name }
     setIncidentLog((list) => [entry, ...list])
     logAudit('Recorded safety incident outcome', `${incident.tripId} — ${incident.outcome}`)
-  }, [currentAdmin.name, logAudit])
+  }, [currentAdmin?.name, logAudit])
 
   const value = {
-    currentAdmin,
+    currentAdmin, adminAccessStatus, adminAccessError, loadAuditLog,
+    adminSettings, adminSettingsLoading, adminSettingsError, loadAdminSettings, saveAdminSetting,
     verifications, drivers, users, trips, safety, payouts, failedPayments, admins, auditLog, notifications,
     decideVerification, bulkApprove, setDriverLive, setUserStatus, addUserNote, handleDeletionRequest,
     archiveUser, archiveDriver, restoreUser, restoreDriver, deleteUser, deleteDriver, archiveAdmin, restoreAdmin, deleteAdmin,

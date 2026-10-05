@@ -4,9 +4,10 @@ import { SignedIn, UserButton, useAuth, useUser } from '@clerk/clerk-react'
 import {
   ShieldCheck, Car, Users, MapPin, Siren, Wallet, SlidersHorizontal,
   MessageSquare, KeyRound, BarChart3, FileText, Bell, Search, Building2,
-  Sparkles, LayoutDashboard, Archive,
+  LayoutDashboard, Archive,
 } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
+import HopOnLogo from '../assets/hopon.logo.png'
 
 const NAV_GROUPS = [
   {
@@ -79,20 +80,18 @@ export default function Layout() {
     .toUpperCase()
 
   return (
-    <div className="flex min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(14,92,63,0.16),_transparent_25%),linear-gradient(180deg,#eef5f1_0%,#f5f7f6_100%)] text-ink">
-      <aside className="animate-fade-in-up relative w-[260px] shrink-0 border-r border-white/20 bg-[#081c16] text-white shadow-[0_20px_45px_rgba(0,0,0,0.18)]">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(24,126,89,0.28),transparent_40%)]" />
+    <div className="flex min-h-screen bg-white text-ink">
+      <aside className="animate-fade-in-up relative w-[260px] shrink-0 border-r border-white/20 bg-brand-deep text-white shadow-[0_20px_45px_rgba(0,0,0,0.18)]">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(157,78,221,0.24),transparent_40%)]" />
         <div className="relative flex h-full flex-col">
           <div className="border-b border-white/10 px-5 py-5">
             <div className="flex items-center gap-3">
-              <div className="soft-glow flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/15 backdrop-blur-sm">
-                <Sparkles size={18} className="text-mint" />
-              </div>
+              <img src={HopOnLogo} alt="HopOn" className="h-10 w-10 rounded-xl bg-white object-contain p-1" />
               <div>
                 <div className="font-display text-xl font-bold tracking-tight">
-                  LYft<span className="text-mint">Admin</span>
+                  Hop<span className="text-brand-accent">On</span>
                 </div>
-                <div className="text-[11px] text-white/45">Operations console</div>
+                <div className="text-[11px] text-white/45">Admin console</div>
               </div>
             </div>
           </div>
@@ -118,7 +117,7 @@ export default function Layout() {
                     >
                       {({ isActive }) => (
                         <>
-                          <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${isActive ? 'bg-accent/30 text-white' : 'bg-white/5 text-white/75 group-hover:bg-white/10'}`}>
+                          <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${isActive ? 'bg-brand-accent/30 text-white' : 'bg-white/5 text-white/75 group-hover:bg-white/10'}`}>
                             <Icon size={16} strokeWidth={2.1} />
                           </span>
                           <span>{label}</span>
@@ -139,7 +138,7 @@ export default function Layout() {
           <div className="border-t border-white/10 px-4 py-4">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-3 backdrop-blur-sm">
               <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-mint to-accent text-xs font-bold text-ink shadow-lg shadow-emerald-500/20">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-brand-accent to-brand-dark text-xs font-bold text-white shadow-lg shadow-purple-900/20">
                   {initials || 'A'}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -173,7 +172,7 @@ export default function Layout() {
               </div>
               <SignedIn>
                 <div className="flex items-center gap-2 rounded-full border border-black/5 bg-white px-1.5 py-1 shadow-sm transition hover:shadow-md">
-                  <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-accent-100 via-emerald-100 to-mint text-xs font-bold text-accent-700">
+                  <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-brand-accent/20 via-brand-dark/10 to-brand-accent/30 text-xs font-bold text-brand-dark">
                     {isLoaded && user?.imageUrl ? (
                       <img src={user.imageUrl} alt={displayName} className="h-full w-full object-cover" />
                     ) : (
@@ -188,7 +187,7 @@ export default function Layout() {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-5 md:p-6">
+        <main className="flex-1 overflow-y-auto bg-white p-5 md:p-6">
           <div className="mx-auto max-w-[1600px]">
             {outageBanner && (
               <div className="mb-5 flex items-start gap-3 rounded-2xl border border-amber/25 bg-amber-bg px-4 py-3 text-sm text-amber-700 shadow-sm">

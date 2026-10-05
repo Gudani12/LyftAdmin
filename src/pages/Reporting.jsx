@@ -99,7 +99,7 @@ export default function Reporting() {
   }
 
   const metrics = [
-    { label: 'Active users', value: stats.activeUsers, tone: 'emerald', icon: Users, detail: '+12.4% vs last week' },
+    { label: 'Active users', value: stats.activeUsers, tone: 'violet', icon: Users, detail: '+12.4% vs last week' },
     { label: 'Completed trips', value: stats.completed, tone: 'blue', icon: TrendingUp, detail: 'Across all service areas' },
     { label: 'Gross revenue', value: `R${stats.revenue.toLocaleString()}`, tone: 'amber', icon: Wallet, detail: 'From completed rides' },
     { label: 'Check rate', value: `${stats.approvalRate}%`, tone: 'violet', icon: ShieldCheck, detail: 'Doc approval rate' },
@@ -157,7 +157,7 @@ export default function Reporting() {
                   <span className="font-mono text-slate2">{count}</span>
                 </div>
                 <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
-                  <div className="h-full rounded-full bg-gradient-to-r from-accent to-emerald-400" style={{ width: `${(count / maxReasonCount) * 100}%` }} />
+                  <div className="h-full rounded-full bg-gradient-to-r from-brand-dark to-brand-accent" style={{ width: `${(count / maxReasonCount) * 100}%` }} />
                 </div>
               </div>
             )) : (
@@ -215,10 +215,9 @@ function TimeSeriesCard({ title, subtitle, series, keys, colors, labels, unavail
 
 function MetricCard({ label, value, detail, tone, Icon }) {
   const tones = {
-    emerald: 'from-emerald-500/15 to-emerald-200/10 text-good border-emerald-100',
+    violet: 'from-brand-dark/15 to-brand-accent/10 text-brand-dark border-brand-accent/20',
     blue: 'from-sky-500/15 to-blue-200/10 text-info border-sky-100',
     amber: 'from-amber-500/15 to-yellow-200/10 text-amber-700 border-amber-100',
-    violet: 'from-violet-500/15 to-fuchsia-200/10 text-violet-700 border-violet-100',
   }
 
   return (

@@ -91,7 +91,7 @@ export default function UsersPage() {
                 <div className="flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-accent-100 to-emerald-100 text-xs font-bold text-accent-700">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-brand-accent/15 to-brand-dark/10 text-xs font-bold text-brand-dark">
                         {u.name.split(' ').map((s) => s[0]).join('').slice(0, 2)}
                       </div>
                       <div className="min-w-0">
