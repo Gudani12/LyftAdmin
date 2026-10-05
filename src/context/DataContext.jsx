@@ -4,7 +4,7 @@ import {
   initialVerifications, initialUsers, initialTrips,
   initialSafety, initialPayouts, initialFailedPayments, ROLES,
 } from '../data/mockData.js'
-import { safetySupabase, setSupabaseAccessTokenProvider, supabase } from '../lib/supabaseClient.js'
+import { retrySupabaseRequestOnInvalidToken, safetySupabase, setSupabaseAccessTokenProvider, supabase } from '../lib/supabaseClient.js'
 
 const DataContext = createContext(null)
 export const useData = () => useContext(DataContext)
@@ -163,7 +163,7 @@ export function DataProvider({ children }) {
   const [adminSettingsError, setAdminSettingsError] = useState(null)
 
   useEffect(() => {
-    setSupabaseAccessTokenProvider(() => getToken())
+    setSupabaseAccessTokenProvider((options) => getToken(options))
     return () => setSupabaseAccessTokenProvider(null)
   }, [getToken])
 
@@ -188,7 +188,9 @@ export function DataProvider({ children }) {
   const loadSOSAlerts = useCallback(async () => {
     setSosLoading(true)
     setSosError(null)
-    const { data, error } = await safetySupabase.from('safety_alerts').select('*')
+    const { data, error } = await retrySupabaseRequestOnInvalidToken(
+      () => safetySupabase.from('safety_alerts').select('*')
+    )
     if (error) {
       console.error('Failed to load SOS alerts from Supabase', error)
       setSosError(error)
@@ -267,7 +269,9 @@ export function DataProvider({ children }) {
     const loadCurrentAdmin = async () => {
       setAdminAccessStatus('loading')
       setAdminAccessError(null)
-      const { data, error } = await supabase.from('admin').select('*').eq('clerk_id', user.id).maybeSingle()
+      const { data, error } = await retrySupabaseRequestOnInvalidToken(
+        () => supabase.from('admin').select('*').eq('clerk_id', user.id).maybeSingle()
+      )
       if (error) {
         console.error('Failed to load current admin profile from Supabase', error)
         setCurrentAdmin(null)
