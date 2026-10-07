@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react'
+import { useOutletContext } from 'react-router-dom'
 import { Car, Search, ShieldAlert, CheckCircle2, AlertTriangle, BadgeCheck, CircleDashed, Webhook } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
 import { DOC_TYPES } from '../data/mockData.js'
@@ -9,7 +10,7 @@ const DRIVER_DOC_KEYS = ['drivers_licence', 'pdp', 'vehicle_registration', 'road
 export default function Drivers() {
   const { drivers, currentAdmin, driversLoading, driversError, setDriverLive, archiveDriver, restoreDriver, deleteDriver } = useData()
   const [active, setActive] = useState(null)
-  const [query, setQuery] = useState('')
+  const { searchQuery: query, setSearchQuery: setQuery } = useOutletContext()
   const [statusFilter, setStatusFilter] = useState('all')
   const [actionError, setActionError] = useState('')
 

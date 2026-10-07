@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react'
+import { useOutletContext } from 'react-router-dom'
 import { Archive, ArchiveRestore, Search, Trash2 } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
 import { ROLES } from '../data/mockData.js'
@@ -13,9 +14,9 @@ const ROLE_STYLES = {
 
 export default function AdminAccounts() {
   const { admins, currentAdmin, auditLog, archiveAdmin, restoreAdmin, deleteAdmin } = useData()
+  const { searchQuery: query, setSearchQuery: setQuery } = useOutletContext()
   const [roleFilter, setRoleFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
-  const [query, setQuery] = useState('')
   const [actionError, setActionError] = useState('')
 
   const runAdminAction = async (action) => {
@@ -175,17 +176,6 @@ export default function AdminAccounts() {
         </div>
       </div>
 
-      <div className="mt-6">
-        <div className="rounded-2xl border border-ui-border bg-ui-surface p-5 shadow-sm">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-ui-muted">Planned — not yet built</p>
-          <ul className="space-y-2">
-            <li className="flex items-start gap-2 text-sm text-ui-ink">
-              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-accent/60" />
-              Enable multi-factor authentication in Clerk for all admin accounts
-            </li>
-          </ul>
-        </div>
-      </div>
     </div>
   )
 }

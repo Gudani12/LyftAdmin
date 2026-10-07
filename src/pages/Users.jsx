@@ -1,11 +1,12 @@
 import React, { useMemo, useState } from 'react'
+import { useOutletContext } from 'react-router-dom'
 import { Ban, Search, Trash2, UserRound, ShieldAlert, CheckCircle2, ArrowUpRight, XCircle } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
 import { Rail, StatusBadge, Button, Modal, SectionHeader, EmptyState, Card } from '../components/ui.jsx'
 
 export default function UsersPage() {
   const { users, currentAdmin, setUserStatus, addUserNote, handleDeletionRequest, archiveUser, restoreUser, deleteUser, bannedIdentifiers, banIdentifier, unbanIdentifier } = useData()
-  const [query, setQuery] = useState('')
+  const { searchQuery: query, setSearchQuery: setQuery } = useOutletContext()
   const [statusFilter, setStatusFilter] = useState('all')
   const [roleFilter, setRoleFilter] = useState('all')
   const [active, setActive] = useState(null)

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { SignedIn, UserButton, useAuth, useUser } from '@clerk/clerk-react'
 import {
@@ -45,6 +45,7 @@ export default function Layout() {
   const { safety, currentAdmin, outageBanner } = useData()
   const { user, isLoaded } = useUser()
   const { signOut } = useAuth()
+  const [searchQuery, setSearchQuery] = useState('')
   const openSOS = safety.sos.filter((s) => s.status === 'open').length
 
   useEffect(() => {
@@ -157,6 +158,8 @@ export default function Layout() {
             <div className="relative flex-1 max-w-xl">
               <Search size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate2" />
               <input
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
                 placeholder="Search users, drivers, trips..."
                 className="w-full rounded-2xl border border-black/5 bg-[#f5f7f6] pl-10 pr-3 py-2.5 text-sm text-ink shadow-[0_1px_0_rgba(15,23,42,0.02)] outline-none transition focus:border-accent/40 focus:bg-white focus:ring-4 focus:ring-accent/10"
               />
@@ -198,7 +201,7 @@ export default function Layout() {
                 </div>
               </div>
             )}
-            <Outlet />
+            <Outlet context={{ searchQuery, setSearchQuery }} />
           </div>
         </main>
       </div>

@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Navigation, Pause, Play, RotateCcw, Square, TrendingUp, Clock, CheckCircle2, XCircle } from 'lucide-react'
+import { useOutletContext } from 'react-router-dom'
+import { Navigation, Pause, Play, RotateCcw, Square, TrendingUp, Clock, CheckCircle2, XCircle, Search } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
 import { Rail, StatusBadge, Button, Modal, SectionHeader, EmptyState, fmtDate, Card } from '../components/ui.jsx'
 
 export default function Trips() {
   const { trips, forceEndTrip } = useData()
+  const { searchQuery, setSearchQuery } = useOutletContext()
   const [statusFilter, setStatusFilter] = useState('in_progress')
   const [active, setActive] = useState(null)
 
@@ -19,9 +21,17 @@ export default function Trips() {
   }, [trips])
 
   const filtered = useMemo(() => {
-    const list = statusFilter === 'all' ? trips : trips.filter((t) => t.status === statusFilter)
+    const q = searchQuery.trim().toLowerCase()
+    const list = trips.filter((trip) => {
+      const matchesStatus = statusFilter === 'all' || trip.status === statusFilter
+      const searchableText = [trip.id, trip.rider, trip.driver, trip.pickup, trip.dropoff, trip.status]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+      return matchesStatus && (!q || searchableText.includes(q))
+    })
     return [...list].sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt))
-  }, [trips, statusFilter])
+  }, [trips, statusFilter, searchQuery])
 
   return (
     <div className="space-y-6">
@@ -35,16 +45,28 @@ export default function Trips() {
         <KPICard label="Avg fare" value={`R${Math.round(summary.avgFare)}`} tone="accent" icon={Clock} />
       </div>
 
-      <div className="flex items-center gap-1.5 mb-4">
-        {['in_progress', 'completed', 'cancelled', 'all'].map((s) => (
-          <button
-            key={s}
-            onClick={() => setStatusFilter(s)}
-            className={`rounded-full px-3 py-1 text-xs font-medium capitalize border transition ${statusFilter === s ? 'bg-deep text-white border-deep' : 'border-black/10 text-ink-700 hover:bg-black/5'}`}
-          >
-            {s.replace('_', ' ')}
-          </button>
-        ))}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative w-full sm:max-w-sm">
+          <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate2" />
+          <input
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Search trip, rider, driver, or location..."
+            aria-label="Search trips"
+            className="w-full rounded-xl border border-black/10 bg-slate-50 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-accent/40 focus:ring-4 focus:ring-accent/10"
+          />
+        </div>
+        <div className="flex items-center gap-1.5">
+          {['in_progress', 'completed', 'cancelled', 'all'].map((s) => (
+            <button
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              className={`rounded-full px-3 py-1 text-xs font-medium capitalize border transition ${statusFilter === s ? 'bg-deep text-white border-deep' : 'border-black/10 text-ink-700 hover:bg-black/5'}`}
+            >
+              {s.replace('_', ' ')}
+            </button>
+          ))}
+        </div>
       </div>
 
       {filtered.length === 0 ? (

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { AlertCircle, Building2, Check, Crosshair, MapPin, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 import { Circle, CircleMarker, MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet'
+import { useOutletContext } from 'react-router-dom'
 import 'leaflet/dist/leaflet.css'
 import { useData } from '../context/DataContext.jsx'
 import { Button, EmptyState, Modal, SectionHeader, StatusBadge } from '../components/ui.jsx'
@@ -11,7 +12,7 @@ const EMPTY_FORM = { name: '', address: '', latitude: JOHANNESBURG.latitude, lon
 
 export default function Hubs() {
   const { hubs, hubsLoading, hubsError, createHub, updateHub, deleteHub } = useData()
-  const [query, setQuery] = useState('')
+  const { searchQuery: query, setSearchQuery: setQuery } = useOutletContext()
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
