@@ -172,15 +172,15 @@ export default function Layout() {
               </div>
               <SignedIn>
                 <div className="flex items-center gap-2 rounded-full border border-black/5 bg-white px-1.5 py-1 shadow-sm transition hover:shadow-md">
-                  <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-brand-accent/20 via-brand-dark/10 to-brand-accent/30 text-xs font-bold text-brand-dark">
-                    {isLoaded && user?.imageUrl ? (
-                      <img src={user.imageUrl} alt={displayName} className="h-full w-full object-cover" />
-                    ) : (
-                      initials || 'A'
-                    )}
-                  </div>
-                  <span className="hidden text-sm font-medium text-ink md:inline">{isLoaded ? displayName : currentAdmin?.name || 'Admin'}</span>
-                  <UserButton afterSignOutUrl="/login" appearance={{ elements: { avatarBox: 'h-8 w-8' } }} />
+                  <UserButton
+                    afterSignOutUrl="/login"
+                    appearance={{
+                      elements: {
+                        avatarBox: 'h-8 w-8',
+                        userButtonTrigger: 'border-0 bg-transparent p-0',
+                      },
+                    }}
+                  />
                 </div>
               </SignedIn>
             </div>
