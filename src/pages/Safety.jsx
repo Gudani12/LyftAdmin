@@ -18,7 +18,7 @@ function beep() {
 }
 
 export default function Safety() {
-  const { safety, users, trips, acknowledgeSOS, escalateSOS, resolveSOS, sosLoading, sosError, sosRealtimeStatus, loadSOSAlerts, tripChats, incidentLog, recordIncident } = useData()
+  const { safety, users, trips, currentAdmin, acknowledgeSOS, escalateSOS, resolveSOS, sosLoading, sosError, sosRealtimeStatus, loadSOSAlerts, tripChats, incidentLog, recordIncident } = useData()
   const [muted, setMuted] = useState(false)
   const [resolving, setResolving] = useState(null)
   const [note, setNote] = useState('')
@@ -35,6 +35,7 @@ export default function Safety() {
   const ackSOS = safety.sos.filter((s) => s.status === 'acknowledged')
   const resolvedSOS = safety.sos.filter((s) => s.status === 'resolved')
   const escalatedSOS = safety.sos.filter((s) => s.status === 'escalated')
+  const canViewSOS = currentAdmin?.status === 'active' && ['super_admin', 'support'].includes(currentAdmin.role)
 
   const summary = useMemo(() => ({
     open: openSOS.length,
@@ -86,7 +87,16 @@ export default function Safety() {
       </div>
 
       {!sosLoading && safety.sos.length === 0 ? (
-        <EmptyState title={sosError ? 'SOS inbox unavailable' : 'No SOS alerts visible to this admin'} hint={sosError ? 'Check the safety_alerts table and its Supabase read policy.' : 'If safety_alerts contains rows in Supabase, confirm this app uses the same project and that its RLS policy grants this admin read access.'} />
+        <EmptyState
+          title={sosError ? 'SOS inbox unavailable' : !canViewSOS ? 'SOS access limited to Safety admins' : 'No SOS alerts visible to this admin'}
+          hint={
+            sosError
+              ? 'Check the safety_alerts table and its Supabase read policy.'
+              : !canViewSOS
+                ? `Only active support and super_admin accounts can read SOS alerts. Your current role is ${currentAdmin?.role || 'unknown'}.`
+                : 'If safety_alerts contains rows in Supabase, confirm this app uses the same project and that its RLS policy grants this admin read access.'
+          }
+        />
       ) : (
         <div className="space-y-3 mb-6">
           {[...openSOS, ...ackSOS, ...escalatedSOS, ...resolvedSOS].map((s) => (

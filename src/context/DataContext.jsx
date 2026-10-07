@@ -10,13 +10,38 @@ const DataContext = createContext(null)
 export const useData = () => useContext(DataContext)
 
 const CURRENT_ADMIN = { id: 'adm_5', name: 'You', role: 'super_admin' }
-const PRESENTATION_ADMIN = {
-  id: 'user_3HDsbBFCEFwD3A2yVg5ZAjDhKgY',
-  clerk_id: 'user_3HDsbBFCEFwD3A2yVg5ZAjDhKgY',
-  name: 'Gudani Makwarela',
-  email: 'gudanimakwarela12@gmail.com',
-  role: 'super_admin',
-  status: 'active',
+const PRESENTATION_ADMIN_ACCOUNTS = [
+  {
+    id: 'user_3HDsbBFCEFwD3A2yVg5ZAjDhKgY',
+    clerk_id: 'user_3HDsbBFCEFwD3A2yVg5ZAjDhKgY',
+    name: 'Gudani Makwarela',
+    email: 'gudanimakwarela12@gmail.com',
+    role: 'super_admin',
+    status: 'active',
+  },
+  {
+    id: 'user_3HByAN5i1Q7LNEuVC6chNZ80FX6',
+    clerk_id: 'user_3HByAN5i1Q7LNEuVC6chNZ80FX6',
+    name: 'Mulweli',
+    email: 'mulw3li1@gmail.com',
+    role: 'super_admin',
+    status: 'active',
+  },
+]
+
+const getPresentationAdmin = (clerkUser) => {
+  if (!clerkUser) return null
+
+  const clerkId = clerkUser.id || clerkUser.clerk_id
+  if (clerkId) {
+    const byId = PRESENTATION_ADMIN_ACCOUNTS.find((admin) => admin.clerk_id === clerkId)
+    if (byId) return byId
+  }
+
+  const email = clerkUser.primaryEmailAddress?.emailAddress || clerkUser.emailAddress || clerkUser.email || ''
+  if (!email) return null
+
+  return PRESENTATION_ADMIN_ACCOUNTS.find((admin) => admin.email?.toLowerCase() === email.toLowerCase()) || null
 }
 
 
@@ -170,7 +195,9 @@ export function DataProvider({ children }) {
   const loadDrivers = useCallback(async () => {
     setDriversLoading(true)
     setDriversError(null)
-    const { data, error } = await supabase.from('drivers').select('*')
+    const { data, error } = await retrySupabaseRequestOnInvalidToken(
+      () => supabase.from('drivers').select('*')
+    )
     if (error) {
       console.error('Failed to load drivers from Supabase', error)
       setDrivers([])
@@ -280,9 +307,10 @@ export function DataProvider({ children }) {
         return
       }
       if (!data || !ROLES.includes(data.role) || (data.status || 'active') !== 'active') {
-        if (import.meta.env.DEV && user.id === PRESENTATION_ADMIN.clerk_id) {
-          setCurrentAdmin(PRESENTATION_ADMIN)
-          setAdmins([PRESENTATION_ADMIN])
+        const presentationAdmin = getPresentationAdmin(user)
+        if (import.meta.env.DEV && presentationAdmin) {
+          setCurrentAdmin(presentationAdmin)
+          setAdmins(PRESENTATION_ADMIN_ACCOUNTS.filter((admin) => admin.role === 'super_admin'))
           setAdminAccessStatus('presentation')
           return
         }
