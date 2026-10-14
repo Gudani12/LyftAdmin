@@ -4,7 +4,7 @@ import { SignedIn, UserButton, useAuth, useUser } from '@clerk/clerk-react'
 import {
   ShieldCheck, Car, Users, MapPin, Siren, Wallet, SlidersHorizontal,
   MessageSquare, KeyRound, BarChart3, FileText, Bell, Search, Building2,
-  LayoutDashboard, Archive,
+  LayoutDashboard, Archive, Menu, X,
 } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
 import HopOnLogo from '../assets/hopon.logo.png'
@@ -46,7 +46,22 @@ export default function Layout() {
   const { user, isLoaded } = useUser()
   const { signOut } = useAuth()
   const [searchQuery, setSearchQuery] = useState('')
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const openSOS = safety.sos.filter((s) => s.status === 'open').length
+
+  useEffect(() => {
+    if (!mobileNavOpen) return undefined
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setMobileNavOpen(false)
+    }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [mobileNavOpen])
 
   useEffect(() => {
     const idleTimeout = 30 * 60 * 1000
@@ -82,22 +97,33 @@ export default function Layout() {
 
   return (
     <div className="flex min-h-screen bg-white text-ink">
-      <aside className="animate-fade-in-up relative w-[260px] shrink-0 border-r border-white/20 bg-brand-deep text-white shadow-[0_20px_45px_rgba(0,0,0,0.18)]">
+      {mobileNavOpen && (
+        <button
+          type="button"
+          aria-label="Close navigation menu"
+          className="fixed inset-0 z-30 bg-black/50 md:hidden"
+          onClick={() => setMobileNavOpen(false)}
+        />
+      )}
+      <aside id="primary-navigation" className={`animate-fade-in-up fixed inset-y-0 left-0 z-40 flex w-[280px] max-w-[85vw] shrink-0 flex-col border-r border-white/20 bg-brand-deep text-white shadow-[0_20px_45px_rgba(0,0,0,0.18)] transition-transform duration-200 md:relative md:inset-auto md:z-auto md:w-[260px] md:max-w-none md:translate-x-0 md:shadow-none ${mobileNavOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(157,78,221,0.24),transparent_40%)]" />
-        <div className="relative flex h-full flex-col">
+        <div className="relative flex min-h-0 flex-1 flex-col">
           <div className="border-b border-white/10 px-5 py-5">
             <div className="flex items-center gap-3">
               <img src={HopOnLogo} alt="HopOn" className="h-10 w-10 rounded-xl bg-white object-contain p-1" />
-              <div>
+              <div className="min-w-0 flex-1">
                 <div className="font-display text-xl font-bold tracking-tight">
                   Hop<span className="text-brand-accent">On</span>
                 </div>
                 <div className="text-[11px] text-white/45">Admin console</div>
               </div>
+              <button type="button" aria-label="Close navigation menu" className="rounded-lg p-2 text-white/70 hover:bg-white/10 hover:text-white md:hidden" onClick={() => setMobileNavOpen(false)}>
+                <X size={20} />
+              </button>
             </div>
           </div>
 
-          <nav className="flex-1 overflow-y-auto px-3 py-4">
+          <nav aria-label="Primary navigation" className="flex-1 overflow-y-auto px-3 py-4">
             {NAV_GROUPS.map((group) => (
               <div key={group.label} className="mb-5 last:mb-0">
                 <div className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/35">
@@ -108,6 +134,7 @@ export default function Layout() {
                     <NavLink
                       key={to}
                       to={to}
+                      onClick={() => setMobileNavOpen(false)}
                       className={({ isActive }) =>
                         `group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 hover:-translate-x-0.5 ${
                           isActive
@@ -154,18 +181,28 @@ export default function Layout() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-20 border-b border-black/5 bg-white/75 backdrop-blur-xl">
-          <div className="flex items-center justify-between gap-6 px-6 py-3.5">
-            <div className="relative flex-1 max-w-xl">
+          <div className="flex items-center justify-between gap-2 px-3 py-2.5 sm:gap-4 sm:px-5 md:gap-6 md:px-6 md:py-3.5">
+            <button
+              type="button"
+              aria-label="Open navigation menu"
+              aria-controls="primary-navigation"
+              aria-expanded={mobileNavOpen}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-black/5 bg-white text-ink shadow-sm md:hidden"
+              onClick={() => setMobileNavOpen(true)}
+            >
+              <Menu size={19} />
+            </button>
+            <div className="relative min-w-0 max-w-xl flex-1">
               <Search size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate2" />
               <input
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
                 placeholder="Search users, drivers, trips..."
-                className="w-full rounded-2xl border border-black/5 bg-[#f5f7f6] pl-10 pr-3 py-2.5 text-sm text-ink shadow-[0_1px_0_rgba(15,23,42,0.02)] outline-none transition focus:border-accent/40 focus:bg-white focus:ring-4 focus:ring-accent/10"
+                className="w-full rounded-2xl border border-black/5 bg-[#f5f7f6] py-2.5 pl-10 pr-3 text-sm text-ink shadow-[0_1px_0_rgba(15,23,42,0.02)] outline-none transition placeholder:text-xs focus:border-accent/40 focus:bg-white focus:ring-4 focus:ring-accent/10 sm:placeholder:text-sm"
               />
             </div>
 
-            <div className="flex items-center gap-4 shrink-0">
+            <div className="flex shrink-0 items-center gap-2 sm:gap-3 md:gap-4">
               <div className="hidden rounded-full border border-black/5 bg-white px-3 py-1.5 text-sm text-slate2 md:block">
                 South Africa &middot; Johannesburg (UTC+2)
               </div>
@@ -190,8 +227,12 @@ export default function Layout() {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto bg-white p-5 md:p-6">
+        <main className="min-w-0 flex-1 overflow-y-auto bg-white p-3 sm:p-5 md:p-6">
           <div className="mx-auto max-w-[1600px]">
+            <div role="status" className="mb-5 flex items-start gap-3 rounded-2xl border border-amber/25 bg-amber-bg px-4 py-3 text-sm text-amber-700 shadow-sm">
+              <span className="shrink-0 font-semibold uppercase tracking-wide">Demo notice</span>
+              <span>Some workflows use sample or simulated data and do not update live rider, trip, or payment systems.</span>
+            </div>
             {outageBanner && (
               <div className="mb-5 flex items-start gap-3 rounded-2xl border border-amber/25 bg-amber-bg px-4 py-3 text-sm text-amber-700 shadow-sm">
                 <Bell size={17} className="mt-0.5 shrink-0" />

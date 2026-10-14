@@ -456,7 +456,7 @@ export function DataProvider({ children }) {
     setAdminSettings(settings)
     if ('banned_identifiers' in settings) setBannedIdentifiers(settings.banned_identifiers || [])
     if ('communication_templates' in settings) setCommunicationTemplates(settings.communication_templates || {})
-    if ('outage_banner' in settings) setOutageBanner(settings.outage_banner)
+    if ('outage_banner' in settings) setOutageBanner(settings.outage_banner?.enabled === false ? null : settings.outage_banner)
     if ('incident_log' in settings) setIncidentLog(settings.incident_log || [])
     setAdminSettingsLoading(false)
     return { data }
@@ -468,8 +468,9 @@ export function DataProvider({ children }) {
 
   const saveAdminSetting = useCallback(async (key, value) => {
     if (adminAccessStatus !== 'authorized' || !user?.id) return { error: new Error('Admin access is required to save settings.') }
+    const persistedValue = key === 'outage_banner' && value === null ? { enabled: false } : value
     const { data, error } = await supabase.from('admin_app_settings')
-      .upsert({ key, value, updated_by: user.id, updated_at: new Date().toISOString() }, { onConflict: 'key' })
+      .upsert({ key, value: persistedValue, updated_by: user.id, updated_at: new Date().toISOString() }, { onConflict: 'key' })
       .select('key, value')
       .single()
     if (error) {
