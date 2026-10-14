@@ -20,14 +20,27 @@ const PRESENTATION_ADMIN_ACCOUNTS = [
     status: 'active',
   },
   {
-    id: 'user_3HByAN5i1Q7LNEuVC6chNZ80FX6',
-    clerk_id: 'user_3HByAN5i1Q7LNEuVC6chNZ80FX6',
+    id: 'user_3HByAN5iiQ7LNEuVC6chNZ80fX6',
+    clerk_id: 'user_3HByAN5iiQ7LNEuVC6chNZ80fX6',
     name: 'Mulweli',
     email: 'mulw3li1@gmail.com',
     role: 'super_admin',
     status: 'active',
   },
+  {
+    id: 'user_3I2snNbZjhpoULH0rJBZQ8S48t1',
+    clerk_id: 'user_3I2snNbZjhpoULH0rJBZQ8S48t1',
+    name: 'T. Macholo',
+    email: 'tmacholo980@gmail.com',
+    role: 'super_admin',
+    status: 'active',
+  },
 ]
+
+const getClerkUserEmail = (clerkUser) => {
+  if (!clerkUser) return ''
+  return clerkUser.primaryEmailAddress?.emailAddress || clerkUser.emailAddresses?.[0]?.emailAddress || clerkUser.emailAddress || clerkUser.email || ''
+}
 
 const getPresentationAdmin = (clerkUser) => {
   if (!clerkUser) return null
@@ -38,7 +51,7 @@ const getPresentationAdmin = (clerkUser) => {
     if (byId) return byId
   }
 
-  const email = clerkUser.primaryEmailAddress?.emailAddress || clerkUser.emailAddress || clerkUser.email || ''
+  const email = getClerkUserEmail(clerkUser)
   if (!email) return null
 
   return PRESENTATION_ADMIN_ACCOUNTS.find((admin) => admin.email?.toLowerCase() === email.toLowerCase()) || null
@@ -265,7 +278,7 @@ export function DataProvider({ children }) {
       .subscribe((status) => {
         setSosRealtimeStatus(status === 'SUBSCRIBED' ? 'connected' : status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED' ? 'disconnected' : 'connecting')
       })
-    return () => { supabase.removeChannel(channel) }
+    return () => { safetySupabase.removeChannel(channel) }
   }, [loadSOSAlerts, user?.id])
 
   useEffect(() => {
@@ -296,17 +309,47 @@ export function DataProvider({ children }) {
     const loadCurrentAdmin = async () => {
       setAdminAccessStatus('loading')
       setAdminAccessError(null)
-      const { data, error } = await retrySupabaseRequestOnInvalidToken(
-        () => supabase.from('admin').select('*').eq('clerk_id', user.id).maybeSingle()
-      )
-      if (error) {
-        console.error('Failed to load current admin profile from Supabase', error)
+
+      const clerkId = user.id || ''
+      const email = getClerkUserEmail(user)
+
+      let adminRow = null
+      let profileLookupError = null
+
+      if (clerkId) {
+        const { data: byClerkId, error: clerkError } = await retrySupabaseRequestOnInvalidToken(
+          () => supabase.from('admin').select('*').eq('clerk_id', clerkId).maybeSingle()
+        )
+        if (clerkError) {
+          console.error('Failed to load current admin profile by Clerk ID from Supabase', clerkError)
+          profileLookupError = clerkError
+        } else if (byClerkId) {
+          adminRow = byClerkId
+        }
+      }
+
+      if (!adminRow && email) {
+        const normalizedEmail = email.trim().toLowerCase()
+        const { data: byEmail, error: emailError } = await retrySupabaseRequestOnInvalidToken(
+          () => supabase.from('admin').select('*').ilike('email', normalizedEmail).maybeSingle()
+        )
+        if (emailError) {
+          console.error('Failed to load current admin profile by email from Supabase', emailError)
+          profileLookupError = emailError
+        } else if (byEmail) {
+          adminRow = byEmail
+        }
+      }
+
+      if (!adminRow && profileLookupError) {
         setCurrentAdmin(null)
-        setAdminAccessError(error)
+        setAdmins([])
+        setAdminAccessError(profileLookupError)
         setAdminAccessStatus('error')
         return
       }
-      if (!data || !ROLES.includes(data.role) || (data.status || 'active') !== 'active') {
+
+      if (!adminRow || !ROLES.includes(adminRow.role) || (adminRow.status || 'active') !== 'active') {
         const presentationAdmin = getPresentationAdmin(user)
         if (import.meta.env.DEV && presentationAdmin) {
           setCurrentAdmin(presentationAdmin)
@@ -320,12 +363,12 @@ export function DataProvider({ children }) {
         return
       }
 
-      const admin = normalizeAdmin(data)
+      const admin = normalizeAdmin(adminRow)
       setCurrentAdmin(admin)
       if (admin.role === 'super_admin') {
         const { data: adminRows, error: adminsError } = await supabase.from('admin').select('*').order('created_at', { ascending: false })
         if (adminsError) console.error('Failed to load admin accounts', adminsError)
-        setAdmins((adminRows || [data]).map(normalizeAdmin))
+        setAdmins((adminRows || [adminRow]).map(normalizeAdmin))
       } else {
         setAdmins([admin])
       }
@@ -523,13 +566,14 @@ export function DataProvider({ children }) {
   }, [verifications, currentAdmin, logAudit, notify])
 
   const bulkApprove = useCallback((ids) => {
-    setVerifications((list) => list.map((v) => ids.includes(v.id) ? { ...v, status: 'approved', decidedAt: new Date().toISOString(), decidedBy: `${CURRENT_ADMIN.role}: ${CURRENT_ADMIN.name}` } : v))
+    const signer = currentAdmin || CURRENT_ADMIN
+    setVerifications((list) => list.map((v) => ids.includes(v.id) ? { ...v, status: 'approved', decidedAt: new Date().toISOString(), decidedBy: `${signer.role}: ${signer.name}` } : v))
     logAudit('Bulk approved verifications', `${ids.length} low-risk items`)
     ids.forEach((id) => {
       const v = verifications.find((x) => x.id === id)
       if (v) notify(v.userName, 'Document approved', `Your ${v.docType.replace(/_/g, ' ')} has been approved.`)
     })
-  }, [verifications, logAudit, notify])
+  }, [currentAdmin, verifications, logAudit, notify])
 
   const setDriverLive = useCallback(async (driverId, live) => {
     const status = live ? 'live' : 'revoked'

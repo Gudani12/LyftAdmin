@@ -1,7 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY
+const viteEnv = typeof import.meta !== 'undefined' ? import.meta.env : undefined
+const processEnv = typeof process !== 'undefined' ? process.env : undefined
+const supabaseUrl = viteEnv?.VITE_SUPABASE_URL || processEnv?.VITE_SUPABASE_URL
+const supabaseKey = viteEnv?.VITE_SUPABASE_PUBLISHABLE_KEY || viteEnv?.VITE_SUPABASE_ANON_KEY || processEnv?.VITE_SUPABASE_PUBLISHABLE_KEY || processEnv?.VITE_SUPABASE_ANON_KEY
 
 if (!supabaseUrl || !supabaseKey) {
   throw new Error(
@@ -32,8 +34,10 @@ const refreshSupabaseAccessToken = async () => {
 
 export async function retrySupabaseRequestOnInvalidToken(request) {
   const result = await request()
-  const errorMessage = `${result.error?.message || ''} ${result.error?.details || ''}`
-  if (!/JWT not yet valid/i.test(errorMessage)) return result
+  const errorMessage = `${result.error?.message || ''} ${result.error?.details || ''}`.trim()
+  const invalidTokenPattern = /JWT\s+(?:not yet valid|expired|invalid|malformed|signature|missing)|token(?:\s+is)?\s+(?:expired|invalid|missing)|authorization.*failed|unauthorized/i
+
+  if (!invalidTokenPattern.test(errorMessage)) return result
 
   await new Promise((resolve) => setTimeout(resolve, 1000))
   await refreshSupabaseAccessToken()
