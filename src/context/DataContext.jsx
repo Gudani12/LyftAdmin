@@ -455,8 +455,6 @@ export function DataProvider({ children }) {
       const { data, error } = await retrySupabaseRequestOnInvalidToken(
         () => supabase.from('rides')
           .select('ride_id, origin_address, origin_latitude, origin_longitude, status, created_at')
-          .not('origin_latitude', 'is', null)
-          .not('origin_longitude', 'is', null)
           .order('created_at', { ascending: false, nullsFirst: false })
           .range(from, from + pageSize - 1)
       )

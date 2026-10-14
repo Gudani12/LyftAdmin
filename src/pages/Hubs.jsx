@@ -19,6 +19,7 @@ export default function Hubs() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
+  const pickupLocationCount = useMemo(() => getRidePickupPoints(rides).length, [rides])
   const recommendations = useMemo(() => getPopularPickupRecommendations(rides, hubs), [rides, hubs])
 
   const filteredHubs = useMemo(() => {
@@ -103,7 +104,7 @@ export default function Hubs() {
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-50 text-accent"><Sparkles size={18} /></div>
           <div>
             <h2 className="font-display text-lg font-semibold">Popular pickup hub recommendations</h2>
-            <p className="mt-1 text-sm text-slate2">K-means groups origin coordinates from rides in the Supabase rides table. Suggestions need at least {MIN_REQUESTS_FOR_RECOMMENDATION} requests and omit areas already covered by active hubs.</p>
+            <p className="mt-1 text-sm text-slate2">K-means groups valid origin coordinates from all rows in the Supabase rides table. Suggestions need at least {MIN_REQUESTS_FOR_RECOMMENDATION} requests and omit areas already covered by active hubs.</p>
           </div>
         </div>
         {ridesError
@@ -111,18 +112,21 @@ export default function Hubs() {
           : ridesLoading
             ? <p className="rounded-xl border border-dashed border-black/10 bg-slate-50 px-4 py-5 text-center text-sm text-slate2">Loading historical ride pickup locations...</p>
             : recommendations.length === 0
-          ? <p className="rounded-xl border border-dashed border-black/10 bg-slate-50 px-4 py-5 text-center text-sm text-slate2">{rides.length === 0 ? 'No rides with origin coordinates were found in the Supabase rides table.' : rides.length < MIN_REQUESTS_FOR_RECOMMENDATION ? `At least ${MIN_REQUESTS_FOR_RECOMMENDATION} rides with origin coordinates are needed to recommend a hub.` : 'No uncovered popular pickup areas found. The available origin coordinates may already be covered by active hubs.'}</p>
+          ? <p className="rounded-xl border border-dashed border-black/10 bg-slate-50 px-4 py-5 text-center text-sm text-slate2">{rides.length === 0 ? 'Supabase returned no rides visible to this admin. Check SELECT access and RLS policies on public.rides.' : pickupLocationCount < MIN_REQUESTS_FOR_RECOMMENDATION ? `Loaded ${rides.length} rides, but only ${pickupLocationCount} have valid origin coordinates. Check origin_latitude and origin_longitude in public.rides.` : 'No uncovered popular pickup areas found. The available origin coordinates may already be covered by active hubs.'}</p>
           : <div className="grid gap-3 lg:grid-cols-3">{recommendations.map((recommendation, index) => (
             <div key={`${recommendation.latitude}-${recommendation.longitude}`} className="rounded-xl border border-black/5 bg-slate-50 p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="font-semibold text-ink">Near {recommendation.nearestPickup}</p>
                   <p className="mt-1 text-sm text-slate2">{recommendation.requestCount} historical pickup requests</p>
+                  {recommendation.coveredBy
+                    ? <p className="mt-2 text-xs font-medium text-good">Already covered by {recommendation.coveredBy}</p>
+                    : <p className="mt-2 text-xs font-medium text-amber-700">No active hub coverage</p>}
                 </div>
                 <span className="rounded-full bg-accent-50 px-2.5 py-1 text-[11px] font-semibold text-accent">#{index + 1}</span>
               </div>
               <p className="mt-3 font-mono text-xs text-slate2">{recommendation.latitude.toFixed(6)}, {recommendation.longitude.toFixed(6)}</p>
-              <Button variant="accent" className="mt-4 w-full" onClick={() => openRecommendation(recommendation)}><Plus size={14} /> Create suggested hub</Button>
+              <Button variant="accent" className="mt-4 w-full" onClick={() => openRecommendation(recommendation)}><Plus size={14} /> Add this recommendation</Button>
             </div>
           ))}</div>}
       </section>
@@ -210,16 +214,21 @@ function MapCenter({ position }) {
   return null
 }
 
-function getPopularPickupRecommendations(rides, hubs) {
-  const points = rides
+function getRidePickupPoints(rides) {
+  return rides
     .map((ride) => {
+      if (ride.origin_latitude === null || ride.origin_latitude === undefined || ride.origin_latitude === ''
+        || ride.origin_longitude === null || ride.origin_longitude === undefined || ride.origin_longitude === '') return null
       const latitude = Number(ride.origin_latitude)
       const longitude = Number(ride.origin_longitude)
       if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) return null
       return { latitude, longitude, label: String(ride.origin_address || 'Pickup area') }
     })
     .filter(Boolean)
+}
 
+function getPopularPickupRecommendations(rides, hubs) {
+  const points = getRidePickupPoints(rides)
   if (points.length < MIN_REQUESTS_FOR_RECOMMENDATION) return []
 
   const clusterCount = Math.min(
@@ -259,15 +268,15 @@ function getPopularPickupRecommendations(rides, hubs) {
     const nearestPickup = clusterPoints.reduce((nearest, point) => (
       squaredDistance(point, center) < squaredDistance(nearest, center) ? point : nearest
     )).label
-    return { ...center, nearestPickup, requestCount: clusterPoints.length }
-  })
-    .filter(Boolean)
-    .filter((recommendation) => !hubs.some((hub) => hub.status === 'active' && distanceInMetres(
-      recommendation.latitude,
-      recommendation.longitude,
+    const coveringHub = hubs.find((hub) => hub.status === 'active' && distanceInMetres(
+      center.latitude,
+      center.longitude,
       Number(hub.latitude),
       Number(hub.longitude),
-    ) <= (Number(hub.radius) || 500)))
+    ) <= (Number(hub.radius) || 500))
+    return { ...center, nearestPickup, requestCount: clusterPoints.length, coveredBy: coveringHub?.name || null }
+  })
+    .filter(Boolean)
     .sort((first, second) => second.requestCount - first.requestCount)
 }
 
