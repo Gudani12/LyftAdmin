@@ -5,8 +5,8 @@ import { useData } from '../context/DataContext.jsx'
 import HopOnLogo from '../assets/hopon.logo.png'
 
 const AuthShell = ({ children }) => (
-  <div className="min-h-screen bg-brand-deep flex items-center justify-center p-4">
-    <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white p-8 shadow-[0_30px_80px_rgba(29,17,53,0.35)]">
+  <div className="min-h-screen bg-brand-deep flex items-center justify-center p-3 sm:p-4">
+    <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white p-5 shadow-[0_30px_80px_rgba(29,17,53,0.35)] sm:p-8">
       {children}
     </div>
   </div>
@@ -51,9 +51,9 @@ export default function Auth() {
 
       <SignedOut>
         {route === 'register' ? (
-          <SignUp path="/register" routing="path" signInUrl="/login" appearance={{ elements: { headerTitle: 'hidden' } }} />
+          <SignUp path="/register" routing="path" signInUrl="/login" appearance={{ elements: { headerTitle: 'hidden', rootBox: '!w-full !max-w-full !min-w-0', cardBox: '!w-full !max-w-full !min-w-0', card: '!w-full !max-w-full !min-w-0' } }} />
         ) : (
-          <SignIn path="/login" routing="path" signUpUrl="/register" appearance={{ elements: { headerTitle: 'hidden' } }} />
+          <SignIn path="/login" routing="path" signUpUrl="/register" appearance={{ elements: { headerTitle: 'hidden', rootBox: '!w-full !max-w-full !min-w-0', cardBox: '!w-full !max-w-full !min-w-0', card: '!w-full !max-w-full !min-w-0' } }} />
         )}
       </SignedOut>
     </AuthShell>

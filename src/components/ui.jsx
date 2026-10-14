@@ -66,7 +66,7 @@ export function Card({ children, className = '' }) {
 
 export function SectionHeader({ title, subtitle, action }) {
   return (
-    <div className="mb-5 flex items-start justify-between gap-4">
+    <div className="mb-5 flex flex-col items-start justify-between gap-3 sm:flex-row sm:gap-4">
       <div>
         <h1 className="font-display text-2xl font-semibold tracking-tight text-ink md:text-[2rem]">{title}</h1>
         {subtitle && <p className="mt-1 text-sm text-slate2">{subtitle}</p>}

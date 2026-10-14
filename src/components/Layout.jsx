@@ -4,7 +4,7 @@ import { SignedIn, UserButton, useAuth, useUser } from '@clerk/clerk-react'
 import {
   ShieldCheck, Car, Users, MapPin, Siren, Wallet, SlidersHorizontal,
   MessageSquare, KeyRound, BarChart3, FileText, Bell, Search, Building2,
-  LayoutDashboard, Archive,
+  LayoutDashboard, Archive, Menu, X,
 } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
 import HopOnLogo from '../assets/hopon.logo.png'
@@ -46,6 +46,7 @@ export default function Layout() {
   const { user, isLoaded } = useUser()
   const { signOut } = useAuth()
   const [searchQuery, setSearchQuery] = useState('')
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const openSOS = safety.sos.filter((s) => s.status === 'open').length
 
   useEffect(() => {
@@ -71,6 +72,15 @@ export default function Layout() {
     }
   }, [signOut])
 
+  useEffect(() => {
+    if (!mobileNavOpen) return undefined
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setMobileNavOpen(false)
+    }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => window.removeEventListener('keydown', closeOnEscape)
+  }, [mobileNavOpen])
+
   const displayName = user?.fullName || user?.firstName || currentAdmin?.name || 'Admin'
   const initials = (user?.fullName || user?.firstName || currentAdmin?.name || 'Admin')
     .split(' ')
@@ -82,18 +92,22 @@ export default function Layout() {
 
   return (
     <div className="flex min-h-screen bg-white text-ink">
-      <aside className="animate-fade-in-up relative w-[260px] shrink-0 border-r border-white/20 bg-brand-deep text-white shadow-[0_20px_45px_rgba(0,0,0,0.18)]">
+      {mobileNavOpen && <button type="button" aria-label="Close navigation menu" onClick={() => setMobileNavOpen(false)} className="fixed inset-0 z-40 bg-black/50 md:hidden" />}
+      <aside className={`${mobileNavOpen ? 'fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw]' : 'hidden'} animate-fade-in-up border-r border-white/20 bg-brand-deep text-white shadow-[0_20px_45px_rgba(0,0,0,0.18)] md:relative md:inset-auto md:z-auto md:flex md:w-[260px] md:shrink-0`}>
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(157,78,221,0.24),transparent_40%)]" />
         <div className="relative flex h-full flex-col">
-          <div className="border-b border-white/10 px-5 py-5">
+          <div className="border-b border-white/10 px-4 py-4 sm:px-5 sm:py-5">
             <div className="flex items-center gap-3">
               <img src={HopOnLogo} alt="HopOn" className="h-10 w-10 rounded-xl bg-white object-contain p-1" />
-              <div>
+              <div className="min-w-0">
                 <div className="font-display text-xl font-bold tracking-tight">
                   Hop<span className="text-brand-accent">On</span>
                 </div>
                 <div className="text-[11px] text-white/45">Admin console</div>
               </div>
+              <button type="button" aria-label="Close navigation menu" onClick={() => setMobileNavOpen(false)} className="ml-auto flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white/70 hover:bg-white/10 hover:text-white md:hidden">
+                <X size={19} />
+              </button>
             </div>
           </div>
 
@@ -108,6 +122,7 @@ export default function Layout() {
                     <NavLink
                       key={to}
                       to={to}
+                      onClick={() => setMobileNavOpen(false)}
                       className={({ isActive }) =>
                         `group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 hover:-translate-x-0.5 ${
                           isActive
@@ -154,18 +169,28 @@ export default function Layout() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-20 border-b border-black/5 bg-white/75 backdrop-blur-xl">
-          <div className="flex items-center justify-between gap-6 px-6 py-3.5">
-            <div className="relative flex-1 max-w-xl">
+          <div className="flex items-center justify-between gap-2 px-3 py-2.5 sm:px-4 md:gap-6 md:px-6 md:py-3.5">
+            <button
+              type="button"
+              aria-label="Open navigation menu"
+              aria-expanded={mobileNavOpen}
+              onClick={() => setMobileNavOpen(true)}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-black/5 bg-white text-slate2 shadow-sm md:hidden"
+            >
+              <Menu size={19} />
+            </button>
+            <div className="relative min-w-0 max-w-xl flex-1">
               <Search size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate2" />
               <input
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
                 placeholder="Search users, drivers, trips..."
-                className="w-full rounded-2xl border border-black/5 bg-[#f5f7f6] pl-10 pr-3 py-2.5 text-sm text-ink shadow-[0_1px_0_rgba(15,23,42,0.02)] outline-none transition focus:border-accent/40 focus:bg-white focus:ring-4 focus:ring-accent/10"
+                aria-label="Search users, drivers, and trips"
+                className="w-full rounded-2xl border border-black/5 bg-[#f5f7f6] py-2.5 pl-9 pr-2 text-xs text-ink shadow-[0_1px_0_rgba(15,23,42,0.02)] outline-none transition focus:border-accent/40 focus:bg-white focus:ring-4 focus:ring-accent/10 sm:pl-10 sm:pr-3 sm:text-sm"
               />
             </div>
 
-            <div className="flex items-center gap-4 shrink-0">
+            <div className="flex shrink-0 items-center gap-2 sm:gap-3 md:gap-4">
               <div className="hidden rounded-full border border-black/5 bg-white px-3 py-1.5 text-sm text-slate2 md:block">
                 South Africa &middot; Johannesburg (UTC+2)
               </div>
@@ -190,7 +215,7 @@ export default function Layout() {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto bg-white p-5 md:p-6">
+        <main className="min-w-0 flex-1 overflow-y-auto bg-white p-3 sm:p-5 md:p-6">
           <div className="mx-auto max-w-[1600px]">
             {outageBanner && (
               <div className="mb-5 flex items-start gap-3 rounded-2xl border border-amber/25 bg-amber-bg px-4 py-3 text-sm text-amber-700 shadow-sm">

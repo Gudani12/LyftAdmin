@@ -70,26 +70,28 @@ export default function Pricing() {
       <div>
         <h2 className="font-display font-semibold mb-4">Per-region overrides</h2>
         <div className="rounded-2xl border border-black/5 bg-white overflow-hidden shadow-[0_10px_24px_rgba(15,23,42,0.03)]">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-xs text-slate2 uppercase tracking-wider border-b border-black/5">
-              <tr>
-                <th className="text-left px-5 py-3 font-semibold">Region</th>
-                <th className="text-left px-5 py-3 font-semibold">Base fare (R)</th>
-                <th className="text-left px-5 py-3 font-semibold">Per km (R)</th>
-                <th className="text-left px-5 py-3 font-semibold">Per minute (R)</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-black/5">
-              {regions.map((r) => (
-                <tr key={r.id} className="hover:bg-slate-50 transition">
-                  <td className="px-5 py-3 font-medium">{r.region}</td>
-                  <td className="px-5 py-3"><InlineInput value={r.baseFare} disabled={adminSettingsLoading} onChange={(v) => updateRegion(r.id, 'baseFare', v)} /></td>
-                  <td className="px-5 py-3"><InlineInput value={r.perKm} disabled={adminSettingsLoading} onChange={(v) => updateRegion(r.id, 'perKm', v)} /></td>
-                  <td className="px-5 py-3"><InlineInput value={r.perMin} disabled={adminSettingsLoading} onChange={(v) => updateRegion(r.id, 'perMin', v)} /></td>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[36rem] text-sm">
+              <thead className="bg-slate-50 text-xs text-slate2 uppercase tracking-wider border-b border-black/5">
+                <tr>
+                  <th className="text-left px-5 py-3 font-semibold">Region</th>
+                  <th className="text-left px-5 py-3 font-semibold">Base fare (R)</th>
+                  <th className="text-left px-5 py-3 font-semibold">Per km (R)</th>
+                  <th className="text-left px-5 py-3 font-semibold">Per minute (R)</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-black/5">
+                {regions.map((r) => (
+                  <tr key={r.id} className="hover:bg-slate-50 transition">
+                    <td className="px-5 py-3 font-medium">{r.region}</td>
+                    <td className="px-5 py-3"><InlineInput value={r.baseFare} disabled={adminSettingsLoading} onChange={(v) => updateRegion(r.id, 'baseFare', v)} /></td>
+                    <td className="px-5 py-3"><InlineInput value={r.perKm} disabled={adminSettingsLoading} onChange={(v) => updateRegion(r.id, 'perKm', v)} /></td>
+                    <td className="px-5 py-3"><InlineInput value={r.perMin} disabled={adminSettingsLoading} onChange={(v) => updateRegion(r.id, 'perMin', v)} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
