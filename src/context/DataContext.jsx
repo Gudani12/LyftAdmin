@@ -196,6 +196,9 @@ export function DataProvider({ children }) {
   const [hubs, setHubs] = useState([])
   const [hubsLoading, setHubsLoading] = useState(false)
   const [hubsError, setHubsError] = useState(null)
+  const [rides, setRides] = useState([])
+  const [ridesLoading, setRidesLoading] = useState(false)
+  const [ridesError, setRidesError] = useState(null)
   const [adminSettings, setAdminSettings] = useState({})
   const [adminSettingsLoading, setAdminSettingsLoading] = useState(true)
   const [adminSettingsError, setAdminSettingsError] = useState(null)
@@ -440,6 +443,49 @@ export function DataProvider({ children }) {
   useEffect(() => {
     if (user?.id) loadHubs()
   }, [loadHubs, user?.id])
+
+  const loadRides = useCallback(async () => {
+    setRidesLoading(true)
+    setRidesError(null)
+    const pageSize = 1000
+    const loadedRides = []
+    let from = 0
+
+    while (true) {
+      const { data, error } = await retrySupabaseRequestOnInvalidToken(
+        () => supabase.from('rides')
+          .select('ride_id, origin_address, origin_latitude, origin_longitude, status, created_at')
+          .not('origin_latitude', 'is', null)
+          .not('origin_longitude', 'is', null)
+          .order('created_at', { ascending: false, nullsFirst: false })
+          .range(from, from + pageSize - 1)
+      )
+      if (error) {
+        console.error('Failed to load ride pickup history from Supabase', error)
+        setRides([])
+        setRidesError(error)
+        setRidesLoading(false)
+        return
+      }
+
+      const page = data || []
+      loadedRides.push(...page)
+      if (page.length < pageSize) break
+      from += pageSize
+    }
+
+    setRides(loadedRides)
+    setRidesLoading(false)
+  }, [])
+
+  useEffect(() => {
+    if (user?.id) loadRides()
+    else {
+      setRides([])
+      setRidesError(null)
+      setRidesLoading(false)
+    }
+  }, [loadRides, user?.id])
 
   const loadAdminSettings = useCallback(async () => {
     if (!user?.id) return { error: new Error('Sign in to load admin settings.') }
@@ -839,6 +885,7 @@ export function DataProvider({ children }) {
     forceEndTrip, refundTrip, retryFailedPayment, sendPushToUser, logAudit,
     driversLoading, driversError,
     hubs, hubsLoading, hubsError, loadHubs, createHub, updateHub, deleteHub,
+    rides, ridesLoading, ridesError, loadRides,
   }
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>

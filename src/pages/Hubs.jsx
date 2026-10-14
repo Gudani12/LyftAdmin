@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { AlertCircle, Building2, Check, Crosshair, MapPin, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
+import { AlertCircle, Building2, Check, Crosshair, MapPin, Pencil, Plus, Search, Sparkles, Trash2, X } from 'lucide-react'
 import { Circle, CircleMarker, MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet'
 import { useOutletContext } from 'react-router-dom'
 import 'leaflet/dist/leaflet.css'
@@ -9,14 +9,17 @@ import { Button, EmptyState, Modal, SectionHeader, StatusBadge } from '../compon
 const JOHANNESBURG = { latitude: -26.2041, longitude: 28.0473 }
 const SOUTH_AFRICA_CENTER = [-30.5595, 22.9375]
 const EMPTY_FORM = { name: '', address: '', latitude: JOHANNESBURG.latitude, longitude: JOHANNESBURG.longitude, radius: 500, status: 'active' }
+const MAX_RECOMMENDATIONS = 3
+const MIN_REQUESTS_FOR_RECOMMENDATION = 2
 
 export default function Hubs() {
-  const { hubs, hubsLoading, hubsError, createHub, updateHub, deleteHub } = useData()
+  const { hubs, hubsLoading, hubsError, rides, ridesLoading, ridesError, createHub, updateHub, deleteHub } = useData()
   const { searchQuery: query, setSearchQuery: setQuery } = useOutletContext()
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
+  const recommendations = useMemo(() => getPopularPickupRecommendations(rides, hubs), [rides, hubs])
 
   const filteredHubs = useMemo(() => {
     const searchTerms = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
@@ -44,6 +47,17 @@ export default function Hubs() {
   const activeCount = hubs.filter((hub) => hub.status === 'active').length
 
   const openCreate = () => { setEditing('new'); setForm({ ...EMPTY_FORM }); setMessage('') }
+  const openRecommendation = (recommendation) => {
+    setEditing('new')
+    setForm({
+      ...EMPTY_FORM,
+      name: `${recommendation.nearestPickup} Pickup Hub`,
+      address: `Near ${recommendation.nearestPickup}`,
+      latitude: recommendation.latitude,
+      longitude: recommendation.longitude,
+    })
+    setMessage('')
+  }
   const openEdit = (hub) => { setEditing(hub.id); setForm({ ...hub }); setMessage('') }
   const closeModal = () => { if (!saving) setEditing(null) }
 
@@ -84,6 +98,34 @@ export default function Hubs() {
         <Summary label="Active hubs" value={activeCount} icon={Check} tone="text-good" />
         <Summary label="Inactive hubs" value={hubs.length - activeCount} icon={X} tone="text-slate2" />
       </div>
+      <section className="rounded-2xl border border-black/5 bg-white p-5 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
+        <div className="mb-4 flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-50 text-accent"><Sparkles size={18} /></div>
+          <div>
+            <h2 className="font-display text-lg font-semibold">Popular pickup hub recommendations</h2>
+            <p className="mt-1 text-sm text-slate2">K-means groups origin coordinates from rides in the Supabase rides table. Suggestions need at least {MIN_REQUESTS_FOR_RECOMMENDATION} requests and omit areas already covered by active hubs.</p>
+          </div>
+        </div>
+        {ridesError
+          ? <p role="alert" className="rounded-xl border border-bad/20 bg-bad-bg px-4 py-5 text-center text-sm text-bad">Could not load ride pickup history from Supabase. Check access to the rides table and try again.</p>
+          : ridesLoading
+            ? <p className="rounded-xl border border-dashed border-black/10 bg-slate-50 px-4 py-5 text-center text-sm text-slate2">Loading historical ride pickup locations...</p>
+            : recommendations.length === 0
+          ? <p className="rounded-xl border border-dashed border-black/10 bg-slate-50 px-4 py-5 text-center text-sm text-slate2">{rides.length === 0 ? 'No rides with origin coordinates were found in the Supabase rides table.' : rides.length < MIN_REQUESTS_FOR_RECOMMENDATION ? `At least ${MIN_REQUESTS_FOR_RECOMMENDATION} rides with origin coordinates are needed to recommend a hub.` : 'No uncovered popular pickup areas found. The available origin coordinates may already be covered by active hubs.'}</p>
+          : <div className="grid gap-3 lg:grid-cols-3">{recommendations.map((recommendation, index) => (
+            <div key={`${recommendation.latitude}-${recommendation.longitude}`} className="rounded-xl border border-black/5 bg-slate-50 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-ink">Near {recommendation.nearestPickup}</p>
+                  <p className="mt-1 text-sm text-slate2">{recommendation.requestCount} historical pickup requests</p>
+                </div>
+                <span className="rounded-full bg-accent-50 px-2.5 py-1 text-[11px] font-semibold text-accent">#{index + 1}</span>
+              </div>
+              <p className="mt-3 font-mono text-xs text-slate2">{recommendation.latitude.toFixed(6)}, {recommendation.longitude.toFixed(6)}</p>
+              <Button variant="accent" className="mt-4 w-full" onClick={() => openRecommendation(recommendation)}><Plus size={14} /> Create suggested hub</Button>
+            </div>
+          ))}</div>}
+      </section>
       {hubsError && <div className="flex items-center gap-2 rounded-xl border border-bad/20 bg-bad-bg px-4 py-3 text-sm text-bad"><AlertCircle size={16} /> Could not load hubs from Supabase. Check the table permissions and try again.</div>}
       {message && <div className="rounded-xl border border-amber/30 bg-amber-bg px-4 py-3 text-sm text-amber-700">{message}</div>}
       <div className="rounded-2xl border border-black/5 bg-white shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
@@ -166,4 +208,82 @@ function MapCenter({ position }) {
   const map = useMap()
   useEffect(() => { map.setView(position) }, [map, position[0], position[1]])
   return null
+}
+
+function getPopularPickupRecommendations(rides, hubs) {
+  const points = rides
+    .map((ride) => {
+      const latitude = Number(ride.origin_latitude)
+      const longitude = Number(ride.origin_longitude)
+      if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) return null
+      return { latitude, longitude, label: String(ride.origin_address || 'Pickup area') }
+    })
+    .filter(Boolean)
+
+  if (points.length < MIN_REQUESTS_FOR_RECOMMENDATION) return []
+
+  const clusterCount = Math.min(
+    MAX_RECOMMENDATIONS,
+    Math.max(1, Math.round(Math.sqrt(points.length / MIN_REQUESTS_FOR_RECOMMENDATION))),
+  )
+  const centers = [points[0]]
+  while (centers.length < clusterCount) {
+    const nextPoint = points.reduce((farthest, point) => {
+      const nearestDistance = Math.min(...centers.map((center) => squaredDistance(point, center)))
+      return !farthest || nearestDistance > farthest.distance ? { point, distance: nearestDistance } : farthest
+    }, null)
+    centers.push(nextPoint.point)
+  }
+
+  let assignments = []
+  for (let iteration = 0; iteration < 50; iteration += 1) {
+    assignments = points.map((point) => centers.reduce((closestIndex, center, index) => (
+      squaredDistance(point, center) < squaredDistance(point, centers[closestIndex]) ? index : closestIndex
+    ), 0))
+    const nextCenters = centers.map((center, index) => {
+      const clusterPoints = points.filter((_, pointIndex) => assignments[pointIndex] === index)
+      if (clusterPoints.length === 0) return center
+      return {
+        latitude: clusterPoints.reduce((sum, point) => sum + point.latitude, 0) / clusterPoints.length,
+        longitude: clusterPoints.reduce((sum, point) => sum + point.longitude, 0) / clusterPoints.length,
+      }
+    })
+    const converged = nextCenters.every((center, index) => squaredDistance(center, centers[index]) < 1e-12)
+    centers.splice(0, centers.length, ...nextCenters)
+    if (converged) break
+  }
+
+  return centers.map((center, index) => {
+    const clusterPoints = points.filter((_, pointIndex) => assignments[pointIndex] === index)
+    if (clusterPoints.length < MIN_REQUESTS_FOR_RECOMMENDATION) return null
+    const nearestPickup = clusterPoints.reduce((nearest, point) => (
+      squaredDistance(point, center) < squaredDistance(nearest, center) ? point : nearest
+    )).label
+    return { ...center, nearestPickup, requestCount: clusterPoints.length }
+  })
+    .filter(Boolean)
+    .filter((recommendation) => !hubs.some((hub) => hub.status === 'active' && distanceInMetres(
+      recommendation.latitude,
+      recommendation.longitude,
+      Number(hub.latitude),
+      Number(hub.longitude),
+    ) <= (Number(hub.radius) || 500)))
+    .sort((first, second) => second.requestCount - first.requestCount)
+}
+
+function squaredDistance(first, second) {
+  const meanLatitude = ((first.latitude + second.latitude) / 2) * Math.PI / 180
+  const latitudeDistance = first.latitude - second.latitude
+  const longitudeDistance = (first.longitude - second.longitude) * Math.cos(meanLatitude)
+  return latitudeDistance ** 2 + longitudeDistance ** 2
+}
+
+function distanceInMetres(firstLatitude, firstLongitude, secondLatitude, secondLongitude) {
+  if (![firstLatitude, firstLongitude, secondLatitude, secondLongitude].every(Number.isFinite)) return Infinity
+  const toRadians = (degrees) => degrees * Math.PI / 180
+  const latitudeDifference = toRadians(secondLatitude - firstLatitude)
+  const longitudeDifference = toRadians(secondLongitude - firstLongitude)
+  const haversine = Math.sin(latitudeDifference / 2) ** 2
+    + Math.cos(toRadians(firstLatitude)) * Math.cos(toRadians(secondLatitude)) * Math.sin(longitudeDifference / 2) ** 2
+  return 6371000 * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine))
 }
