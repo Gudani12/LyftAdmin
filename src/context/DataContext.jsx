@@ -244,7 +244,7 @@ export function DataProvider({ children }) {
         userId: alert.user_id || alert.passenger_id || alert.driver_id,
         user: alert.user_name || alert.passenger_name || alert.driver_name || alert.user || alert.passenger_id || alert.driver_id || 'Unknown user',
         role: alert.user_role || alert.role || (alert.driver_id ? 'driver' : 'rider'),
-        tripId: alert.trip_id || alert.tripId || '—',
+        tripId: alert.ride_id || alert.trip_id || alert.tripId || '—',
         triggeredAt: alert.triggered_at || alert.created_at || alert.inserted_at,
         location: alert.location || alert.address || (Number.isFinite(Number(alert.latitude)) && Number.isFinite(Number(alert.longitude)) ? `${alert.latitude}, ${alert.longitude}` : 'Location unavailable'),
         latitude: alert.latitude,
