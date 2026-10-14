@@ -1,13 +1,17 @@
 import React, { useMemo, useState } from 'react'
+import { useOutletContext } from 'react-router-dom'
 import { FileImage, AlertTriangle, Copy, CheckCircle2, Send } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
 import { DOC_TYPES, REJECTION_REASONS } from '../data/mockData.js'
 import { Rail, StatusBadge, Button, Modal, SectionHeader, EmptyState, Star, timeAgo, fmtDate } from '../components/ui.jsx'
+import useDebouncedValue, { matchesSearch } from '../hooks/useDebouncedValue.js'
 
 const LOW_RISK_TYPES = ['selfie', 'id_document']
 
 export default function Verification() {
   const { verifications, decideVerification, bulkApprove, sendExpiryDigest } = useData()
+  const { searchQuery } = useOutletContext()
+  const debouncedSearchQuery = useDebouncedValue(searchQuery)
   const [statusFilter, setStatusFilter] = useState('pending')
   const [typeFilter, setTypeFilter] = useState('all')
   const [active, setActive] = useState(null)
@@ -25,8 +29,19 @@ export default function Verification() {
     let list = verifications.filter((v) => v.status !== 'not_submitted' || statusFilter === 'not_submitted' || statusFilter === 'all')
     if (statusFilter !== 'all') list = list.filter((v) => v.status === statusFilter)
     if (typeFilter !== 'all') list = list.filter((v) => v.docType === typeFilter)
+    list = list.filter((v) => matchesSearch([
+      v.id,
+      v.userName,
+      v.role,
+      v.docType,
+      DOC_TYPES.find((type) => type.key === v.docType)?.label,
+      v.status,
+      v.typedDetails?.idNumber,
+      v.typedDetails?.fullName,
+      v.typedDetails?.passportNumber,
+    ], debouncedSearchQuery))
     return [...list].sort((a, b) => new Date(a.submittedAt || 0) - new Date(b.submittedAt || 0))
-  }, [verifications, statusFilter, typeFilter])
+  }, [verifications, statusFilter, typeFilter, debouncedSearchQuery])
 
   // Duplicate detection: same ID number typed on two different accounts
   const duplicates = useMemo(() => {
@@ -122,7 +137,10 @@ export default function Verification() {
       <p className="text-xs text-slate2 mb-2">Oldest first &middot; {filtered.length} result{filtered.length === 1 ? '' : 's'}</p>
 
       {filtered.length === 0 ? (
-        <EmptyState title="Nothing in this queue" hint="Try a different status or document type filter." />
+        <EmptyState
+          title={debouncedSearchQuery ? `No results found for '${debouncedSearchQuery}'` : 'Nothing in this queue'}
+          hint={debouncedSearchQuery ? 'Try another search or adjust the status and document type filters.' : 'Try a different status or document type filter.'}
+        />
       ) : (
         <div className="space-y-3">
           {filtered.map((v) => {

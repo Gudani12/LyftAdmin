@@ -2,11 +2,15 @@ import React, { useMemo } from 'react'
 import {
   Activity, AlertTriangle, ArrowUpRight, BellRing, Car, CheckCircle2, ShieldCheck, Users, Wallet,
 } from 'lucide-react'
+import { useOutletContext } from 'react-router-dom'
 import { useData } from '../context/DataContext.jsx'
-import { Card, SectionHeader, StatusBadge } from '../components/ui.jsx'
+import { Card, SectionHeader, StatusBadge, EmptyState } from '../components/ui.jsx'
+import useDebouncedValue, { matchesSearch } from '../hooks/useDebouncedValue.js'
 
 export default function Dashboard() {
   const { verifications, drivers, users, safety, failedPayments, payouts, auditLog } = useData()
+  const { searchQuery } = useOutletContext()
+  const debouncedSearchQuery = useDebouncedValue(searchQuery)
 
   const summary = useMemo(() => {
     const pendingVerifications = verifications.filter((v) => ['pending', 'resubmitted', 'not_submitted'].includes(v.status)).length
@@ -26,26 +30,41 @@ export default function Dashboard() {
     }
   }, [verifications, drivers, users, safety, failedPayments, payouts])
 
-  const priorityItems = useMemo(() => [
-    ...safety.sos.filter((s) => s.status === 'open').slice(0, 3).map((item) => ({
-      title: `${item.user} needs attention`,
-      subtitle: `${item.location} • ${item.role}`,
-      tone: 'bad',
-      meta: item.status,
-    })),
-    ...failedPayments.slice(0, 2).map((item) => ({
-      title: `Payment failed: ${item.rider}`,
-      subtitle: `Trip ${item.tripId} • R${item.amount}`,
-      tone: 'warn',
-      meta: 'payment',
-    })),
-    ...verifications.filter((v) => ['pending', 'resubmitted'].includes(v.status)).slice(0, 2).map((item) => ({
-      title: `${item.userName} verification pending`,
-      subtitle: `${item.docType.replace(/_/g, ' ')} • ${item.role}`,
-      tone: 'info',
-      meta: item.status,
-    })),
-  ], [safety, failedPayments, verifications])
+  const priorityItems = useMemo(() => {
+    const items = [
+      ...safety.sos.filter((s) => s.status === 'open').map((item) => ({
+        title: `${item.user} needs attention`,
+        subtitle: `${item.location} • ${item.role}`,
+        tone: 'bad',
+        meta: item.status,
+      })),
+      ...failedPayments.map((item) => ({
+        title: `Payment failed: ${item.rider}`,
+        subtitle: `Trip ${item.tripId} • R${item.amount}`,
+        tone: 'warn',
+        meta: 'payment',
+      })),
+      ...verifications.filter((v) => ['pending', 'resubmitted'].includes(v.status)).map((item) => ({
+        title: `${item.userName} verification pending`,
+        subtitle: `${item.docType.replace(/_/g, ' ')} • ${item.role}`,
+        tone: 'info',
+        meta: item.status,
+      })),
+    ]
+    const matchingItems = items.filter((item) => matchesSearch([item.title, item.subtitle, item.meta], debouncedSearchQuery))
+    return debouncedSearchQuery ? matchingItems : matchingItems.slice(0, 7)
+  }, [safety, failedPayments, verifications, debouncedSearchQuery])
+
+  const recentActions = useMemo(() => {
+    const matchingEntries = auditLog.filter((entry) => matchesSearch([
+      entry.action,
+      entry.target,
+      entry.adminName,
+      entry.adminRole,
+      entry.at,
+    ], debouncedSearchQuery))
+    return debouncedSearchQuery ? matchingEntries : matchingEntries.slice(0, 5)
+  }, [auditLog, debouncedSearchQuery])
 
   return (
     <div className="space-y-6">
@@ -72,9 +91,9 @@ export default function Dashboard() {
 
           <div className="space-y-3">
             {priorityItems.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-black/10 bg-slate-50 px-4 py-8 text-sm text-slate2 text-center">
-                No active issues to review.
-              </div>
+              debouncedSearchQuery
+                ? <EmptyState title={`No results found for '${debouncedSearchQuery}'`} />
+                : <div className="rounded-2xl border border-dashed border-black/10 bg-slate-50 px-4 py-8 text-sm text-slate2 text-center">No active issues to review.</div>
             ) : (
               priorityItems.map((item, index) => (
                 <div key={`${item.title}-${index}`} className="flex items-start justify-between gap-3 rounded-2xl border border-black/5 bg-slate-50 px-3 py-3">
@@ -96,7 +115,11 @@ export default function Dashboard() {
           </div>
 
           <div className="space-y-3">
-            {auditLog.slice(0, 5).map((entry) => (
+            {recentActions.length === 0 ? (
+              debouncedSearchQuery
+                ? <EmptyState title={`No results found for '${debouncedSearchQuery}'`} />
+                : <EmptyState title="No recent admin actions" />
+            ) : recentActions.map((entry) => (
               <div key={entry.id} className="rounded-2xl border border-black/5 bg-white px-3 py-3">
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-sm font-medium text-ink">{entry.action}</span>

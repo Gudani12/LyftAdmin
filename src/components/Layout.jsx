@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { SignedIn, UserButton, useAuth, useUser } from '@clerk/clerk-react'
 import {
   ShieldCheck, Car, Users, MapPin, Siren, Wallet, SlidersHorizontal,
@@ -45,9 +45,15 @@ export default function Layout() {
   const { safety, currentAdmin, outageBanner } = useData()
   const { user, isLoaded } = useUser()
   const { signOut } = useAuth()
+  const location = useLocation()
   const [searchQuery, setSearchQuery] = useState('')
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const openSOS = safety.sos.filter((s) => s.status === 'open').length
+  const showHeaderSearch = !['/drivers', '/users', '/trips'].includes(location.pathname)
+
+  useEffect(() => {
+    setSearchQuery('')
+  }, [location.pathname])
 
   useEffect(() => {
     const idleTimeout = 30 * 60 * 1000
@@ -179,16 +185,18 @@ export default function Layout() {
             >
               <Menu size={19} />
             </button>
-            <div className="relative min-w-0 max-w-xl flex-1">
-              <Search size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate2" />
-              <input
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Search users, drivers, trips..."
-                aria-label="Search users, drivers, and trips"
-                className="w-full rounded-2xl border border-black/5 bg-[#f5f7f6] py-2.5 pl-9 pr-2 text-xs text-ink shadow-[0_1px_0_rgba(15,23,42,0.02)] outline-none transition focus:border-accent/40 focus:bg-white focus:ring-4 focus:ring-accent/10 sm:pl-10 sm:pr-3 sm:text-sm"
-              />
-            </div>
+            {showHeaderSearch && (
+              <div className="relative min-w-0 max-w-xl flex-1">
+                <Search size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate2" />
+                <input
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Search users, drivers, trips..."
+                  aria-label="Search users, drivers, and trips"
+                  className="w-full rounded-2xl border border-black/5 bg-[#f5f7f6] py-2.5 pl-9 pr-2 text-xs text-ink shadow-[0_1px_0_rgba(15,23,42,0.02)] outline-none transition focus:border-accent/40 focus:bg-white focus:ring-4 focus:ring-accent/10 sm:pl-10 sm:pr-3 sm:text-sm"
+                />
+              </div>
+            )}
 
             <div className="flex shrink-0 items-center gap-2 sm:gap-3 md:gap-4">
               <div className="hidden rounded-full border border-black/5 bg-white px-3 py-1.5 text-sm text-slate2 md:block">

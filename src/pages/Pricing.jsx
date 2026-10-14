@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react'
+import { useOutletContext } from 'react-router-dom'
 import { Check } from 'lucide-react'
-import { SectionHeader, Button } from '../components/ui.jsx'
+import { SectionHeader, Button, EmptyState } from '../components/ui.jsx'
 import { useData } from '../context/DataContext.jsx'
+import useDebouncedValue, { matchesSearch } from '../hooks/useDebouncedValue.js'
 
 const DEFAULT_REGIONS = [
   { id: 1, region: 'Johannesburg', baseFare: 25, perKm: 6.5, perMin: 1.8 },
@@ -11,6 +13,8 @@ const DEFAULT_REGIONS = [
 
 export default function Pricing() {
   const { adminSettings, adminSettingsLoading, adminSettingsError, saveAdminSetting } = useData()
+  const { searchQuery } = useOutletContext()
+  const debouncedSearchQuery = useDebouncedValue(searchQuery)
   const [base, setBase] = useState({ baseFare: 25, perKm: 6.5, perMin: 1.8, surge: 1.0, cancelFee: 15 })
   const [regions, setRegions] = useState(DEFAULT_REGIONS)
   const [saved, setSaved] = useState(false)
@@ -28,6 +32,10 @@ export default function Pricing() {
   const updateRegion = (id, field, value) => {
     setRegions((rs) => rs.map((r) => r.id === id ? { ...r, [field]: value } : r))
   }
+
+  const filteredRegions = regions.filter((region) => matchesSearch([
+    region.region, region.baseFare, region.perKm, region.perMin,
+  ], debouncedSearchQuery))
 
   const save = async () => {
     setSaving(true)
@@ -81,7 +89,13 @@ export default function Pricing() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-black/5">
-                {regions.map((r) => (
+                {filteredRegions.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-5 py-6">
+                      <EmptyState title={`No results found for '${debouncedSearchQuery}'`} />
+                    </td>
+                  </tr>
+                ) : filteredRegions.map((r) => (
                   <tr key={r.id} className="hover:bg-slate-50 transition">
                     <td className="px-5 py-3 font-medium">{r.region}</td>
                     <td className="px-5 py-3"><InlineInput value={r.baseFare} disabled={adminSettingsLoading} onChange={(v) => updateRegion(r.id, 'baseFare', v)} /></td>

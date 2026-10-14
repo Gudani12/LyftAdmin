@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react'
 import { Siren, Volume2, VolumeX, Star as StarIcon, Flag, AlertTriangle, MessageSquare, ClipboardCheck, Phone, PhoneCall, MapPin, RefreshCw, Radio } from 'lucide-react'
+import { useOutletContext } from 'react-router-dom'
 import { useData } from '../context/DataContext.jsx'
 import { Rail, StatusBadge, Button, Modal, SectionHeader, EmptyState, timeAgo, Card, fmtDate } from '../components/ui.jsx'
+import useDebouncedValue, { matchesSearch } from '../hooks/useDebouncedValue.js'
 
 function beep() {
   try {
@@ -19,6 +21,8 @@ function beep() {
 
 export default function Safety() {
   const { safety, users, trips, currentAdmin, acknowledgeSOS, escalateSOS, resolveSOS, sosLoading, sosError, sosRealtimeStatus, loadSOSAlerts, tripChats, incidentLog, recordIncident } = useData()
+  const { searchQuery } = useOutletContext()
+  const debouncedSearchQuery = useDebouncedValue(searchQuery)
   const [muted, setMuted] = useState(false)
   const [resolving, setResolving] = useState(null)
   const [note, setNote] = useState('')
@@ -35,6 +39,27 @@ export default function Safety() {
   const ackSOS = safety.sos.filter((s) => s.status === 'acknowledged')
   const resolvedSOS = safety.sos.filter((s) => s.status === 'resolved')
   const escalatedSOS = safety.sos.filter((s) => s.status === 'escalated')
+  const filteredSOS = safety.sos.filter((s) => matchesSearch([
+    s.user, s.role, s.location, s.tripId, s.status, s.resolvedNote, s.escalationNote,
+  ], debouncedSearchQuery))
+  const filteredOpenSOS = filteredSOS.filter((s) => s.status === 'open')
+  const filteredAckSOS = filteredSOS.filter((s) => s.status === 'acknowledged')
+  const filteredResolvedSOS = filteredSOS.filter((s) => s.status === 'resolved')
+  const filteredEscalatedSOS = filteredSOS.filter((s) => s.status === 'escalated')
+  const filteredLowRatingFlags = safety.lowRatingFlags.filter((flag) => matchesSearch([
+    flag.user, flag.role, flag.rating, flag.tripId, flag.comment,
+  ], debouncedSearchQuery))
+  const filteredReportedUsers = safety.reportedUsers.filter((report) => matchesSearch([
+    report.reported, report.reportedBy, report.reason, report.status, report.id,
+  ], debouncedSearchQuery))
+  const activeTrips = trips.filter((trip) => trip.status === 'in_progress')
+  const filteredActiveTrips = activeTrips.filter((trip) => matchesSearch([
+    trip.id, trip.rider, trip.driver, trip.status,
+  ], debouncedSearchQuery))
+  const matchingIncidents = incidentLog.filter((incident) => matchesSearch([
+    incident.tripId, incident.outcome, incident.notes, incident.recordedAt,
+  ], debouncedSearchQuery))
+  const filteredIncidents = debouncedSearchQuery ? matchingIncidents : matchingIncidents.slice(0, 4)
   const canViewSOS = currentAdmin?.status === 'active' && ['super_admin', 'support'].includes(currentAdmin.role)
 
   const summary = useMemo(() => ({
@@ -86,11 +111,15 @@ export default function Safety() {
         {openSOS.length > 0 && <span className="rounded-full bg-bad text-white text-xs px-2 py-0.5 sos-pulse">{openSOS.length} open</span>}
       </div>
 
-      {!sosLoading && safety.sos.length === 0 ? (
+      {!sosLoading && (safety.sos.length === 0 || (debouncedSearchQuery && filteredSOS.length === 0)) ? (
         <EmptyState
-          title={sosError ? 'SOS inbox unavailable' : !canViewSOS ? 'SOS access limited to Safety admins' : 'No SOS alerts visible to this admin'}
+          title={debouncedSearchQuery && safety.sos.length > 0
+            ? `No results found for '${debouncedSearchQuery}'`
+            : sosError ? 'SOS inbox unavailable' : !canViewSOS ? 'SOS access limited to Safety admins' : 'No SOS alerts visible to this admin'}
           hint={
-            sosError
+            debouncedSearchQuery && safety.sos.length > 0
+              ? 'Try another search query.'
+              : sosError
               ? 'Check the safety_alerts table and its Supabase read policy.'
               : !canViewSOS
                 ? `Only active support and super_admin accounts can read SOS alerts. Your current role is ${currentAdmin?.role || 'unknown'}.`
@@ -99,7 +128,7 @@ export default function Safety() {
         />
       ) : (
         <div className="space-y-3 mb-6">
-          {[...openSOS, ...ackSOS, ...escalatedSOS, ...resolvedSOS].map((s) => (
+          {[...filteredOpenSOS, ...filteredAckSOS, ...filteredEscalatedSOS, ...filteredResolvedSOS].map((s) => (
             <Rail key={s.id} tone={s.status === 'open' || s.status === 'escalated' ? 'urgent' : s.status === 'acknowledged' ? 'warn' : 'ok'}>
               <div className="flex flex-wrap items-center gap-4 px-4 py-3">
                 <div className="min-w-0 flex-1">
@@ -127,9 +156,9 @@ export default function Safety() {
             <StarIcon size={16} className="text-amber" />
             <h2 className="font-display font-semibold">Low-rating flags</h2>
           </div>
-          {safety.lowRatingFlags.length === 0 ? <EmptyState title="No flags" /> : (
+          {filteredLowRatingFlags.length === 0 ? <EmptyState title={debouncedSearchQuery ? `No results found for '${debouncedSearchQuery}'` : 'No flags'} /> : (
             <div className="space-y-3">
-              {safety.lowRatingFlags.map((f) => (
+              {filteredLowRatingFlags.map((f) => (
                 <Rail key={f.id} tone="warn">
                   <div className="px-4 py-3">
                     <div className="text-sm font-medium">{f.user} <span className="text-slate2 capitalize font-normal">({f.role})</span> rated {f.rating}★</div>
@@ -145,9 +174,9 @@ export default function Safety() {
             <Flag size={16} className="text-bad" />
             <h2 className="font-display font-semibold">Reported users</h2>
           </div>
-          {safety.reportedUsers.length === 0 ? <EmptyState title="No reports" /> : (
+          {filteredReportedUsers.length === 0 ? <EmptyState title={debouncedSearchQuery ? `No results found for '${debouncedSearchQuery}'` : 'No reports'} /> : (
             <div className="space-y-3">
-              {safety.reportedUsers.map((r) => (
+              {filteredReportedUsers.map((r) => (
                 <Rail key={r.id} tone={r.status === 'open' ? 'urgent' : 'warn'}>
                   <div className="flex items-center justify-between px-4 py-3">
                     <div>
@@ -166,12 +195,12 @@ export default function Safety() {
       <div className="grid gap-6 xl:grid-cols-2">
         <Card className="p-5">
           <div className="mb-3 flex items-center gap-2"><MessageSquare size={17} className="text-info" /><h2 className="font-display font-semibold">Active trip investigation</h2></div>
-          {trips.filter((trip) => trip.status === 'in_progress').length === 0 ? <p className="text-sm text-slate2">No active trips available.</p> : <div className="space-y-2">{trips.filter((trip) => trip.status === 'in_progress').map((trip) => <div key={trip.id} className="flex items-center justify-between gap-3 rounded-xl border border-black/5 bg-slate-50 px-3 py-2.5"><div><div className="text-sm font-medium">{trip.id}</div><div className="text-xs text-slate2">{trip.rider} with {trip.driver}</div></div><div className="flex gap-1.5"><Button variant="ghost" className="!px-2 !py-1 text-xs" onClick={() => setChatTrip(trip)}>Chat</Button><Button variant="ghost" className="!px-2 !py-1 text-xs" onClick={() => setContactTrip(trip)}><Phone size={12} /> Contact</Button></div></div>)}</div>}
+          {filteredActiveTrips.length === 0 ? <EmptyState title={debouncedSearchQuery ? `No results found for '${debouncedSearchQuery}'` : 'No active trips available'} /> : <div className="space-y-2">{filteredActiveTrips.map((trip) => <div key={trip.id} className="flex items-center justify-between gap-3 rounded-xl border border-black/5 bg-slate-50 px-3 py-2.5"><div><div className="text-sm font-medium">{trip.id}</div><div className="text-xs text-slate2">{trip.rider} with {trip.driver}</div></div><div className="flex gap-1.5"><Button variant="ghost" className="!px-2 !py-1 text-xs" onClick={() => setChatTrip(trip)}>Chat</Button><Button variant="ghost" className="!px-2 !py-1 text-xs" onClick={() => setContactTrip(trip)}><Phone size={12} /> Contact</Button></div></div>)}</div>}
         </Card>
         <Card className="p-5">
           <div className="mb-3 flex items-center gap-2"><ClipboardCheck size={17} className="text-accent" /><h2 className="font-display font-semibold">Incident outcomes</h2></div>
-          {incidentLog.length === 0 ? <p className="text-sm text-slate2">No incident outcomes recorded yet.</p> : <div className="space-y-2">{incidentLog.slice(0, 4).map((incident) => <div key={incident.id} className="rounded-xl border border-black/5 bg-slate-50 px-3 py-2.5 text-sm"><div className="font-medium">{incident.tripId} · {incident.outcome}</div><div className="mt-1 text-xs text-slate2">{incident.notes || 'No additional notes'} · {fmtDate(incident.recordedAt)}</div></div>)}</div>}
-          {trips.filter((trip) => trip.status === 'in_progress').length > 0 && <Button variant="accent" className="mt-3" onClick={() => setIncidentTrip(trips.find((trip) => trip.status === 'in_progress'))}><ClipboardCheck size={13} /> Record outcome</Button>}
+          {filteredIncidents.length === 0 ? <EmptyState title={debouncedSearchQuery ? `No results found for '${debouncedSearchQuery}'` : 'No incident outcomes recorded yet'} /> : <div className="space-y-2">{filteredIncidents.map((incident) => <div key={incident.id} className="rounded-xl border border-black/5 bg-slate-50 px-3 py-2.5 text-sm"><div className="font-medium">{incident.tripId} · {incident.outcome}</div><div className="mt-1 text-xs text-slate2">{incident.notes || 'No additional notes'} · {fmtDate(incident.recordedAt)}</div></div>)}</div>}
+          {filteredActiveTrips.length > 0 && <Button variant="accent" className="mt-3" onClick={() => setIncidentTrip(filteredActiveTrips[0])}><ClipboardCheck size={13} /> Record outcome</Button>}
         </Card>
       </div>
 
