@@ -45,7 +45,7 @@ export default function AdminAccounts() {
       </div>
       {actionError && <div role="alert" className="rounded-xl border border-bad/20 bg-bad-bg px-4 py-3 text-sm text-bad">{actionError}</div>}
 
-      <div className="grid gap-3 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Card className="!border-ui-border !bg-ui-surface !text-ui-ink p-4">
           <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ui-muted">Total admins</div>
           <div className="mt-2 font-display text-3xl font-semibold text-ui-ink">{summary.total}</div>

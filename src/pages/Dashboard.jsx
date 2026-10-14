@@ -54,20 +54,20 @@ export default function Dashboard() {
         subtitle="Quick view of the most important actions across verification, safety, drivers, and money."
       />
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
-        <KpiCard label="Pending verifications" value={summary.pendingVerifications} tone="info" icon={ShieldCheck} />
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-6">
+        <KpiCard label="Pending verifications (sample)" value={summary.pendingVerifications} tone="info" icon={ShieldCheck} />
         <KpiCard label="Open SOS" value={summary.openSOS} tone="bad" icon={BellRing} />
         <KpiCard label="Live drivers" value={summary.liveDrivers} tone="good" icon={Car} />
-        <KpiCard label="Users active" value={summary.activeUsers} tone="accent" icon={Users} />
-        <KpiCard label="Failed payouts" value={summary.failedPayouts} tone="warn" icon={Wallet} />
-        <KpiCard label="Paid this week" value={summary.paidThisWeek} tone="good" icon={CheckCircle2} />
+        <KpiCard label="Users active (sample)" value={summary.activeUsers} tone="accent" icon={Users} />
+        <KpiCard label="Failed payouts (sample)" value={summary.failedPayouts} tone="warn" icon={Wallet} />
+        <KpiCard label="Paid this week (sample)" value={summary.paidThisWeek} tone="good" icon={CheckCircle2} />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
         <Card className="p-5">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="font-display text-xl font-semibold text-ink">Priority queue</h2>
-            <span className="text-xs uppercase tracking-[0.18em] text-slate2">Live</span>
+            <span className="text-xs uppercase tracking-[0.18em] text-slate2">Sample + live</span>
           </div>
 
           <div className="space-y-3">

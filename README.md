@@ -16,6 +16,7 @@ LyftAdmin is a React and Vite operations console for managing users, drivers, ve
 - Reporting trends for trips and verification decisions
 - CSV exports for users, verifications, payouts, and trips
 - Phone and device identifier ban management in the Users workflow
+- Responsive phone navigation and layouts for operational review on small screens
 
 ## Tech stack
 
@@ -111,6 +112,8 @@ The admin Safety page reads `safety_alerts` and subscribes to its Postgres chang
 ## Data and security notes
 
 Some workflows still use seeded data or local state, including passenger moderation, trip operations, payouts/refunds, and outbound notifications. Admin settings and audit history are now shared through Supabase, but payment, messaging, screening, ride, and passenger-account operations still need confirmed source schemas and/or provider-backed server-side integrations before production launch.
+
+The console displays a demo notice while simulated workflows remain. Dashboard metrics marked “sample” must not be presented as live operational data. Before a production deployment, configure production Clerk publishable keys and allowed redirect/origin URLs, validate every Supabase RLS policy with each admin role, and replace the simulated workflows with verified backend integrations.
 
 Recommended production checks:
 
