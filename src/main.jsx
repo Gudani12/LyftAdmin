@@ -4,7 +4,6 @@ import { BrowserRouter } from 'react-router-dom'
 import { ClerkProvider } from '@clerk/clerk-react'
 import App from './App.jsx'
 import { DataProvider } from './context/DataContext.jsx'
-import './styles.css'
 
 const clerkPublishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
 const clerkFrontendApi = import.meta.env.VITE_CLERK_FRONTEND_API
